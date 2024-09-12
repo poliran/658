@@ -1,8 +1,41 @@
+"""
+Lottery Prediction System
+
+This module implements a lottery prediction system using XGBoost and various data analysis techniques.
+It's designed to analyze historical lottery data, train prediction models, and generate predictions
+for future lottery draws.
+
+Classes:
+    LotteryPredictor: The main class that encapsulates all prediction functionality.
+
+Functions:
+    main(): The entry point of the script, demonstrating the usage of the LotteryPredictor class.
+
+The system performs the following key tasks:
+1. Data loading and preprocessing
+2. Feature engineering
+3. Model training using XGBoost
+4. Prediction generation
+5. Data analysis and visualization
+
+Usage:
+    Run this script directly to perform a complete prediction cycle:
+    $ python xgboost-prediction.py
+
+Note:
+    This script requires several external libraries including pandas, numpy, xgboost, scikit-learn,
+    matplotlib, and seaborn. Ensure these are installed before running the script.
+
+Author: [Your Name]
+Date: [Current Date]
+Version: 1.0
+"""
+
 import pandas as pd
 import numpy as np
 from collections import Counter
 from xgboost import XGBRegressor
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 import matplotlib.pyplot as plt
@@ -10,21 +43,50 @@ from datetime import timedelta
 import logging
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.ensemble import VotingRegressor, RandomForestRegressor, GradientBoostingRegressor
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
 class LotteryPredictor:
+    """
+    A class for predicting lottery numbers based on historical data.
+
+    This class provides methods for data preprocessing, feature engineering,
+    model training, and prediction generation for lottery numbers.
+
+    Attributes:
+        df (pd.DataFrame): The main dataframe containing preprocessed lottery data.
+        models (list): A list of trained XGBoost models, one for each lottery number.
+        scalers (list): A list of StandardScaler objects, one for each model.
+        feature_columns (list): A list of feature column names used for prediction.
+    """
+
     def __init__(self):
+        """Initialize the LotteryPredictor with empty attributes."""
         self.df = None
         self.models = []
         self.scalers = []
         self.feature_columns = ['day_of_week', 'month', 'year', 'draw_interval',
                                 'diff_1', 'diff_2', 'diff_3', 'diff_4', 'diff_5',
                                 'increasing_1', 'increasing_2', 'increasing_3', 'increasing_4', 'increasing_5',
-                                'number_range', 'number_mean', 'number_std']
+                                'number_range', 'number_mean', 'number_std',
+                                'rolling_mean', 'rolling_std', 'last_draw_sum',
+                                'days_since_start', 'week_of_year']
 
     def load_and_preprocess_data(self, file_path: str) -> pd.DataFrame:
+        """
+        Load and preprocess the lottery data from a file.
+
+        Args:
+            file_path (str): The path to the input data file.
+
+        Returns:
+            pd.DataFrame: The preprocessed dataframe.
+
+        Raises:
+            Exception: If there's an error in loading or preprocessing the data.
+        """
         try:
             df = pd.read_csv(file_path, sep=r'\s{2,}', engine='python', skiprows=1, header=None)
             df.columns = ["COMBINATIONS", "DRAW DATE"]
@@ -43,6 +105,15 @@ class LotteryPredictor:
             raise
 
     def create_correlation_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Create additional features for correlation analysis.
+
+        Args:
+            df (pd.DataFrame): The input dataframe.
+
+        Returns:
+            pd.DataFrame: The dataframe with additional features.
+        """
         df_features = df.copy()
         for i in range(1, 6):
             df_features[f'diff_{i}'] = df_features[f'num{i+1}'] - df_features[f'num{i}']
@@ -66,9 +137,27 @@ class LotteryPredictor:
         df_features['num_rank_5'] = df_features['num5'].rank(method='dense', ascending=False)
         df_features['num_rank_6'] = df_features['num6'].rank(method='dense', ascending=False)
 
+        # Add more sophisticated features
+        df_features['rolling_mean'] = df_features[['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].rolling(window=5).mean().mean(axis=1)
+        df_features['rolling_std'] = df_features[['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].rolling(window=5).std().mean(axis=1)
+        df_features['last_draw_sum'] = df_features[['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].shift(1).sum(axis=1)
+        
+        # Add time-based features
+        df_features['days_since_start'] = (df_features['DRAW DATE'] - df_features['DRAW DATE'].min()).dt.days
+        df_features['week_of_year'] = df_features['DRAW DATE'].dt.isocalendar().week
+        
         return df_features
 
     def is_prime(self, n: int) -> bool:
+        """
+        Check if a number is prime.
+
+        Args:
+            n (int): The number to check.
+
+        Returns:
+            bool: True if the number is prime, False otherwise.
+        """
         if n <= 1:
             return False
         if n <= 3:
@@ -83,24 +172,31 @@ class LotteryPredictor:
         return True
 
     def _validate_models_and_features(self, next_draw_features):
-            """
-            Validate the models and input features.
+        """
+        Validate the models and input features.
 
-            Args:
-                next_draw_features (pd.DataFrame): The input features for prediction.
-            """
-            if not isinstance(next_draw_features, pd.DataFrame):
-                raise ValueError("Input features must be a pandas DataFrame")
-            
-            # Validate the shape of the input features
-            required_columns = ['day_of_week', 'month', 'year', 'draw_interval']
-            if set(required_columns).issubset(set(next_draw_features.columns)):
-                return next_draw_features
-            else:
-                raise ValueError(f"Missing columns: {required_columns}")
+        Args:
+            next_draw_features (pd.DataFrame): The input features for prediction.
 
+        Raises:
+            ValueError: If the input features are invalid.
+        """
+        if not isinstance(next_draw_features, pd.DataFrame):
+            raise ValueError("Input features must be a pandas DataFrame")
+        
+        # Validate the shape of the input features
+        required_columns = ['day_of_week', 'month', 'year', 'draw_interval']
+        if set(required_columns).issubset(set(next_draw_features.columns)):
+            return next_draw_features
+        else:
+            raise ValueError(f"Missing columns: {required_columns}")
 
     def analyze_correlations(self) -> None:
+        """
+        Analyze and visualize correlations between features.
+
+        This method creates a correlation matrix heatmap for the feature columns.
+        """
         corr_matrix = self.df[self.feature_columns].corr()
         plt.figure(figsize=(12, 10))
         plt.imshow(corr_matrix, cmap='coolwarm', interpolation='nearest')
@@ -109,6 +205,12 @@ class LotteryPredictor:
         plt.show()    
 
     def analyze_number_frequency(self) -> Counter:
+        """
+        Analyze the frequency of numbers in the lottery draws.
+
+        Returns:
+            Counter: A Counter object with the frequency of each number.
+        """
         number_frequency = Counter(self.df[['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].values.ravel())
         most_common_numbers = number_frequency.most_common(10)
         least_common_numbers = sorted(number_frequency.items(), key=lambda item: item[1])[:10]
@@ -117,6 +219,12 @@ class LotteryPredictor:
         return number_frequency
 
     def train_models(self) -> None:
+        """
+        Train XGBoost models for predicting each lottery number.
+
+        This method trains six separate models, one for each lottery number.
+        It uses the feature columns defined in self.feature_columns for training.
+        """
         X = self.df[self.feature_columns]
         for i in range(1, 7):
             y = self.df[f'num{i}']
@@ -124,17 +232,35 @@ class LotteryPredictor:
             scaler = StandardScaler()
             X_train_scaled = scaler.fit_transform(X_train)
             X_test_scaled = scaler.transform(X_test)
-            model = XGBRegressor(random_state=42)
-            model.fit(X_train_scaled, y_train)
-            self.models.append(model)
+            
+            # Create an ensemble of models
+            model1 = XGBRegressor(random_state=42)
+            model2 = RandomForestRegressor(random_state=42)
+            model3 = GradientBoostingRegressor(random_state=42)
+            
+            ensemble = VotingRegressor([('xgb', model1), ('rf', model2), ('gb', model3)])
+            ensemble.fit(X_train_scaled, y_train)
+            
+            self.models.append(ensemble)
             self.scalers.append(scaler)
-            train_predictions = model.predict(X_train_scaled)
-            test_predictions = model.predict(X_test_scaled)
+            
+            train_predictions = ensemble.predict(X_train_scaled)
+            test_predictions = ensemble.predict(X_test_scaled)
             train_mse = mean_squared_error(y_train, train_predictions)
             test_mse = mean_squared_error(y_test, test_predictions)
             logging.info(f"Model {i} - Train MSE: {train_mse:.4f}, Test MSE: {test_mse:.4f}")
 
     def generate_predictions(self, next_draw_features: pd.DataFrame) -> np.ndarray:
+        
+        """
+        Generate predictions for the next lottery draw.
+
+        Args:
+            next_draw_features (pd.DataFrame): Features for the next draw.
+
+        Returns:
+            np.ndarray: An array of predicted numbers for the next draw.
+        """
         self._validate_models_and_features(next_draw_features)
 
         top_num = [58, 2, 25, 50, 42, 56, 10, 47, 44, 5, 29, 19, 37, 9, 48, 30, 11, 3, 43, 46, 14, 34, 21, 55, 6, 4, 32, 40, 35]
@@ -159,6 +285,17 @@ class LotteryPredictor:
         return np.array(predictions)
 
     def _find_next_available_number(self, existing_numbers: list, top_numbers: list, start: int = 1) -> int:
+        """
+        Find the next available number that is not in existing_numbers.
+
+        Args:
+            existing_numbers (list): List of numbers already used.
+            top_numbers (list): List of priority numbers.
+            start (int): The starting number to search from.
+
+        Returns:
+            int: The next available number.
+        """
         all_numbers = set(range(start, 59))  # Assuming the lottery numbers range from 1 to 58
         available_numbers = list(all_numbers - set(existing_numbers))
         
@@ -171,9 +308,30 @@ class LotteryPredictor:
             return min(available_numbers)
 
     def generate_unique_number(self, existing_numbers: list, top_numbers: list) -> int:
+        """
+        Generate a unique number not in existing_numbers.
+
+        Args:
+            existing_numbers (list): List of numbers already used.
+            top_numbers (list): List of priority numbers.
+
+        Returns:
+            int: A unique number.
+        """
         return self._find_next_available_number(existing_numbers, top_numbers)
 
     def adjust_prediction(self, pred: np.ndarray, last_combination: list, top_numbers: list,) -> list:
+        """
+        Adjust the raw predictions to ensure uniqueness and validity.
+
+        Args:
+            pred (np.ndarray): Raw predictions.
+            last_combination (list): The last drawn lottery numbers.
+            top_numbers (list): List of priority numbers.
+
+        Returns:
+            list: Adjusted and unique predictions.
+        """
         pred = np.round(pred).astype(int)
         pred = np.clip(pred, 1, 58)
         pred = np.sort(pred)
@@ -217,7 +375,9 @@ def main() -> None:
         'draw_interval': [last_draw_interval],
         'diff_1': [0], 'diff_2': [0], 'diff_3': [0], 'diff_4': [0], 'diff_5': [0],
         'increasing_1': [0], 'increasing_2': [0], 'increasing_3': [0], 'increasing_4': [0], 'increasing_5': [0],
-        'number_range': [0], 'number_mean': [0], 'number_std': [0]
+        'number_range': [0], 'number_mean': [0], 'number_std': [0],
+        'rolling_mean': [0], 'rolling_std': [0], 'last_draw_sum': [0],
+        'days_since_start': [0], 'week_of_year': [0]
     })
 
     raw_predictions = predictor.generate_predictions(next_draw_features)
@@ -233,10 +393,24 @@ def main() -> None:
     logging.info(f"Number frequency: {number_frequency}")
     logging.info(f"Raw predictions: {raw_predictions}")
     logging.info(f"Adjusted prediction: {final_prediction}")
-    logging.info("Program execution completed successfully.")
+    # Plot number frequency
+    plt.figure(figsize=(12, 6))
+    plt.bar(number_frequency.keys(), number_frequency.values())
+    plt.title('Frequency of Numbers in Ultra Lotto 6/58')
+    plt.xlabel('Number')
+    plt.ylabel('Frequency')
+    plt.xticks(range(1, 59, 5))  # Set x-axis ticks from 1 to 58, with steps of 5
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    
+    # Add value labels on top of each bar
+    for i, v in number_frequency.items():
+        plt.text(i, v, str(v), ha='center', va='bottom')
+    
+    plt.tight_layout()
+    plt.savefig('number_frequency_plot.png')
+    plt.close()
+
+    logging.info("Number frequency plot saved as 'number_frequency_plot.png'")
 
 if __name__ == "__main__":
     main()
-
-
-
