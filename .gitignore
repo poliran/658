@@ -1,0 +1,42 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Logs
+*.log
+
+# Data files
+*.csv
+*.txt
+*.xlsx
+*.json
+
+# Model files
+*.model
+*.h5
+*.pkl
+
+# Output files
+*.png
+*.jpg
+*.jpeg
+*.pdf
+
+# Virtual environment
+venv/
+env/
+ENV/
+.venv/
+
+# IDE specific files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Miscellaneous
+.DS_Store
+Thumbs.db

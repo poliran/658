@@ -9,8 +9,14 @@ from sklearn.decomposition import PCA
 import joblib
 
 def load_and_preprocess_data(file_path):
-    df = pd.read_csv(file_path, sep='\t')
-    df['DRAW DATE'] = pd.to_datetime(df['DRAW DATE'], format='%m/%d/%Y')
+    # Use comma as the separator
+    df = pd.read_csv(file_path, sep=',')  # Change sep='\t' to sep=','
+    
+    # Check the columns in the DataFrame
+    print("Columns in DataFrame:", df.columns.tolist())
+    
+    # Update the column name if necessary
+    df['DRAW DATE'] = pd.to_datetime(df['DRAW DATE'], format='%m/%d/%Y')  # Ensure this matches the actual column name
     return df
 
 def extract_numbers(combination, separator='-'):
@@ -48,7 +54,6 @@ def train_model(X, y):
     print(f'Mean Squared Error: {mse:.2f}')
 
     # Additional Feature Selection and PCA
-    # Feature Importance
     feature_importances = model.feature_importances_
     print("Feature Importances:", feature_importances)
 
@@ -90,7 +95,7 @@ def generate_recommendations(numbers, historical_analysis, model):
         numbers = [random.randint(1, 58) for _ in range(6)]
     
     recommendations = []
-    for _ in range(5):
+    for _ in range(2):
         recommended_numbers = []
         if random.random() < 0.3:
             recommended_numbers.extend([num for num, _ in historical_analysis['most_common']])
@@ -98,7 +103,7 @@ def generate_recommendations(numbers, historical_analysis, model):
             recommended_numbers.extend([num for num, _ in historical_analysis['least_common']])
         
         while len(recommended_numbers) < 6:
-            recommended_numbers.append(random.randint(1, 49))
+            recommended_numbers.append(random.randint(1, 58))
         
         recommendations.append(sorted(recommended_numbers))
     

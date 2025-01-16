@@ -88,15 +88,27 @@ class LotteryPredictor:
             Exception: If there's an error in loading or preprocessing the data.
         """
         try:
-            df = pd.read_csv(file_path, sep=r'\s{2,}', engine='python', skiprows=1, header=None)
-            df.columns = ["COMBINATIONS", "DRAW DATE"]
-            df["DRAW DATE"] = pd.to_datetime(df["DRAW DATE"], format="%m/%d/%Y", errors='coerce')
+            # Read the file with comma as separator and all columns as strings
+            df = pd.read_csv(file_path, sep=',', header=0, dtype=str)
+            
+            # Rename columns
+            df.columns = ["LOTTO_GAME", "COMBINATIONS", "DRAW_DATE", "JACKPOT", "WINNERS"]
+            
+            # Convert DRAW_DATE to datetime
+            df["DRAW DATE"] = pd.to_datetime(df["DRAW_DATE"], format="%m/%d/%Y", errors='coerce')
             df = df.sort_values(by="DRAW DATE")
+            
+            # Calculate draw interval
             df['draw_interval'] = df["DRAW DATE"].diff().dt.days.fillna(0)
-            df[['num1', 'num2', 'num3', 'num4', 'num5', 'num6']] = df['COMBINATIONS'].str.extract(r'(\d+)-(\d+)-(\d+)-(\d+)-(\d+)-(\d+)', expand=True).astype(int)
+            
+            # Extract individual numbers from COMBINATIONS
+            df[['num1', 'num2', 'num3', 'num4', 'num5', 'num6']] = df['COMBINATIONS'].str.split('-', expand=True).astype(int)
+            
+            # Extract date features
             df['day_of_week'] = df['DRAW DATE'].dt.dayofweek
             df['month'] = df['DRAW DATE'].dt.month
             df['year'] = df['DRAW DATE'].dt.year
+            
             self.df = self.create_correlation_features(df)
             logging.info("Data loaded and preprocessed successfully.")
             return self.df
@@ -121,8 +133,6 @@ class LotteryPredictor:
         df_features['number_range'] = df_features[['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].max(axis=1) - df_features[['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].min(axis=1)
         df_features['number_mean'] = df_features[['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].mean(axis=1)
         df_features['number_std'] = df_features[['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].std(axis=1)
-
-        # Additional feature engineering
         df_features['num_frequencies'] = df_features.apply(lambda row: sum([row['num1'], row['num2'], row['num3'], row['num4'], row['num5'], row['num6']].count(x) for x in range(1, 59)), axis=1)
         df_features['odd_numbers'] = df_features.apply(lambda row: sum([x % 2 != 0 for x in [row['num1'], row['num2'], row['num3'], row['num4'], row['num5'], row['num6']]]), axis=1)
         df_features['prime_numbers'] = df_features.apply(lambda row: sum([self.is_prime(x) for x in [row['num1'], row['num2'], row['num3'], row['num4'], row['num5'], row['num6']]]), axis=1)
@@ -226,6 +236,10 @@ class LotteryPredictor:
         It uses the feature columns defined in self.feature_columns for training.
         """
         X = self.df[self.feature_columns]
+        
+        # Handle missing values
+        X = X.fillna(X.mean())  # Fill NaN values with column mean
+        
         for i in range(1, 7):
             y = self.df[f'num{i}']
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -239,6 +253,12 @@ class LotteryPredictor:
             model3 = GradientBoostingRegressor(random_state=42)
             
             ensemble = VotingRegressor([('xgb', model1), ('rf', model2), ('gb', model3)])
+            
+            # Remove rows with NaN values in y_train
+            mask = ~np.isnan(y_train)
+            X_train_scaled = X_train_scaled[mask]
+            y_train = y_train[mask]
+
             ensemble.fit(X_train_scaled, y_train)
             
             self.models.append(ensemble)
@@ -263,7 +283,7 @@ class LotteryPredictor:
         """
         self._validate_models_and_features(next_draw_features)
 
-        top_num = [58, 2, 25, 50, 42, 56, 10, 47, 44, 5, 29, 19, 37, 9, 48, 30, 11, 3, 43, 46, 14, 34, 21, 55, 6, 4, 32, 40, 35]
+        top_num = [6, 10, 22, 25, 13, 14, 34, 19, 43, 2, 1, 54, 9, 3, 8, 5, 53, 56, 16, 15, 50, 55, 46, 38, 47, 17, 11, 45, 29]
         predictions = []
 
         for i in range(6):
@@ -414,3 +434,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

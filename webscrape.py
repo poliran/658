@@ -29,10 +29,10 @@ eventvalidation = soup.find('input', {'id': '__EVENTVALIDATION'})['value']
 form_data = {
     "ctl00$ctl00$cphContainer$cpContent$ddlStartMonth": "January",
     "ctl00$ctl00$cphContainer$cpContent$ddlStartDate": "1",
-    "ctl00$ctl00$cphContainer$cpContent$ddlStartYear": "2014",
-    "ctl00$ctl00$cphContainer$cpContent$ddlEndMonth": "September",
-    "ctl00$ctl00$cphContainer$cpContent$ddlEndDay": "12",
-    "ctl00$ctl00$cphContainer$cpContent$ddlEndYear": "2024",
+    "ctl00$ctl00$cphContainer$cpContent$ddlStartYear": "2015",
+    "ctl00$ctl00$cphContainer$cpContent$ddlEndMonth": "January",
+    "ctl00$ctl00$cphContainer$cpContent$ddlEndDay": "4",
+    "ctl00$ctl00$cphContainer$cpContent$ddlEndYear": "2025",
     "ctl00$ctl00$cphContainer$cpContent$ddlSelectGame": "18",  # change for games played
     "__EVENTTARGET": "ctl00$ctl00$cphContainer$cpContent$btnSearch",
     "__VIEWSTATE": viewstate,
@@ -73,4 +73,4 @@ df = pd.DataFrame(data, columns=headers)
 df.to_csv('658.txt', index=False)
 df.to_json('658.json', orient='records', indent=4)
 
-print("Data has been saved to Result.csv")
+print("Data has been saved to 658.txt & 658.json")
