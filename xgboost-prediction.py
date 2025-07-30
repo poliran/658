@@ -34,15 +34,15 @@ Version: 1.0
 import pandas as pd
 import numpy as np
 from collections import Counter
-from xgboost import XGBRegressor
+from xgboost import XGBRegressor # type: ignore
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt # type: ignore
 from datetime import timedelta
 import logging
-import matplotlib.pyplot as plt
-import seaborn as sns
+import matplotlib.pyplot as plt # type: ignore
+import seaborn as sns # type: ignore
 from sklearn.ensemble import VotingRegressor, RandomForestRegressor, GradientBoostingRegressor
 
 # Configure logging
@@ -95,8 +95,8 @@ class LotteryPredictor:
             df.columns = ["LOTTO_GAME", "COMBINATIONS", "DRAW_DATE", "JACKPOT", "WINNERS"]
             
             # Convert DRAW_DATE to datetime
-            df["DRAW DATE"] = pd.to_datetime(df["DRAW_DATE"], format="%m/%d/%Y", errors='coerce')
-            df = df.sort_values(by="DRAW DATE")
+            df["DRAW_DATE"] = pd.to_datetime(df["DRAW_DATE"], format="%m/%d/%Y", errors='coerce')
+            df = df.sort_values(by="DRAW_DATE")
             
             # Calculate draw interval
             df['draw_interval'] = df["DRAW DATE"].diff().dt.days.fillna(0)
@@ -118,43 +118,39 @@ class LotteryPredictor:
 
     def create_correlation_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Create additional features for correlation analysis.
-
-        Args:
-            df (pd.DataFrame): The input dataframe.
-
-        Returns:
-            pd.DataFrame: The dataframe with additional features.
+        Create additional features for correlation analysis with vectorized operations.
         """
         df_features = df.copy()
-        for i in range(1, 6):
-            df_features[f'diff_{i}'] = df_features[f'num{i+1}'] - df_features[f'num{i}']
-            df_features[f'increasing_{i}'] = (df_features[f'num{i+1}'] > df_features[f'num{i}']).astype(int)
-        df_features['number_range'] = df_features[['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].max(axis=1) - df_features[['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].min(axis=1)
-        df_features['number_mean'] = df_features[['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].mean(axis=1)
-        df_features['number_std'] = df_features[['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].std(axis=1)
-        df_features['num_frequencies'] = df_features.apply(lambda row: sum([row['num1'], row['num2'], row['num3'], row['num4'], row['num5'], row['num6']].count(x) for x in range(1, 59)), axis=1)
-        df_features['odd_numbers'] = df_features.apply(lambda row: sum([x % 2 != 0 for x in [row['num1'], row['num2'], row['num3'], row['num4'], row['num5'], row['num6']]]), axis=1)
-        df_features['prime_numbers'] = df_features.apply(lambda row: sum([self.is_prime(x) for x in [row['num1'], row['num2'], row['num3'], row['num4'], row['num5'], row['num6']]]), axis=1)
-        df_features['consecutive_numbers'] = df_features.apply(lambda row: sum([x + 1 == y for x, y in zip([row['num1'], row['num2'], row['num3'], row['num4'], row['num5']], [row['num2'], row['num3'], row['num4'], row['num5'], row['num6']])]), axis=1)
-        df_features['number_pairs'] = df_features.apply(lambda row: sum([x == y for x, y in zip([row['num1'], row['num2'], row['num3'], row['num4'], row['num5']], [row['num2'], row['num3'], row['num4'], row['num5'], row['num6']])]), axis=1)
-        df_features['number_triples'] = df_features.apply(lambda row: sum([x == y == z for x, y, z in zip([row['num1'], row['num2'], row['num3']], [row['num2'], row['num3'], row['num4']], [row['num3'], row['num4'], row['num5']])]), axis=1)
-        # Number ranking feature
-        df_features['num_rank_1'] = df_features['num1'].rank(method='dense', ascending=False)
-        df_features['num_rank_2'] = df_features['num2'].rank(method='dense', ascending=False)
-        df_features['num_rank_3'] = df_features['num3'].rank(method='dense', ascending=False)
-        df_features['num_rank_4'] = df_features['num4'].rank(method='dense', ascending=False)
-        df_features['num_rank_5'] = df_features['num5'].rank(method='dense', ascending=False)
-        df_features['num_rank_6'] = df_features['num6'].rank(method='dense', ascending=False)
-
-        # Add more sophisticated features
-        df_features['rolling_mean'] = df_features[['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].rolling(window=5).mean().mean(axis=1)
-        df_features['rolling_std'] = df_features[['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].rolling(window=5).std().mean(axis=1)
-        df_features['last_draw_sum'] = df_features[['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].shift(1).sum(axis=1)
         
-        # Add time-based features
-        df_features['days_since_start'] = (df_features['DRAW DATE'] - df_features['DRAW DATE'].min()).dt.days
-        df_features['week_of_year'] = df_features['DRAW DATE'].dt.isocalendar().week
+        # Vectorized number columns for faster operations
+        number_cols = [f'num{i}' for i in range(1, 7)]
+        numbers = df_features[number_cols].values
+        
+        # Calculate differences using numpy operations
+        for i in range(1, 6):
+            df_features[f'diff_{i}'] = numbers[:, i] - numbers[:, i-1]
+            df_features[f'increasing_{i}'] = (numbers[:, i] > numbers[:, i-1]).astype(int)
+        
+        # Vectorized statistical calculations
+        df_features['number_range'] = np.ptp(numbers, axis=1)
+        df_features['number_mean'] = np.mean(numbers, axis=1)
+        df_features['number_std'] = np.std(numbers, axis=1)
+        
+        # Vectorized frequency calculations
+        number_matrix = numbers.reshape(-1, 1) == np.arange(1, 59)
+        df_features['num_frequencies'] = number_matrix.sum(axis=1)
+        
+        # Vectorized calculations for odd/prime numbers
+        df_features['odd_numbers'] = (numbers % 2 != 0).sum(axis=1)
+        
+        # Use numpy for consecutive numbers check
+        df_features['consecutive_numbers'] = np.sum(numbers[:, 1:] == numbers[:, :-1] + 1, axis=1)
+        
+        # More efficient rolling calculations
+        number_means = df_features[number_cols].rolling(window=5).mean()
+        df_features['rolling_mean'] = number_means.mean(axis=1)
+        df_features['rolling_std'] = df_features[number_cols].rolling(window=5).std().mean(axis=1)
+        df_features['last_draw_sum'] = df_features[number_cols].shift(1).sum(axis=1)
         
         return df_features
 
@@ -203,16 +199,17 @@ class LotteryPredictor:
 
     def analyze_correlations(self) -> None:
         """
-        Analyze and visualize correlations between features.
-
-        This method creates a correlation matrix heatmap for the feature columns.
+        Analyze correlations with proper resource cleanup.
         """
-        corr_matrix = self.df[self.feature_columns].corr()
-        plt.figure(figsize=(12, 10))
-        plt.imshow(corr_matrix, cmap='coolwarm', interpolation='nearest')
-        plt.colorbar()
-        plt.title('Correlation Matrix')
-        plt.show()    
+        try:
+            fig = plt.figure(figsize=(12, 10))
+            corr_matrix = self.df[self.feature_columns].corr()
+            plt.imshow(corr_matrix, cmap='coolwarm', interpolation='nearest')
+            plt.colorbar()
+            plt.title('Correlation Matrix')
+            plt.show()
+        finally:
+            plt.close(fig)  # Ensure figure is closed
 
     def analyze_number_frequency(self) -> Counter:
         """
@@ -230,79 +227,119 @@ class LotteryPredictor:
 
     def train_models(self) -> None:
         """
-        Train XGBoost models for predicting each lottery number.
-
-        This method trains six separate models, one for each lottery number.
-        It uses the feature columns defined in self.feature_columns for training.
+        Optimized model training with validation and error handling.
         """
-        X = self.df[self.feature_columns]
+        if self.df is None:
+            raise ValueError("No data loaded. Call load_and_preprocess_data first.")
         
-        # Handle missing values
-        X = X.fillna(X.mean())  # Fill NaN values with column mean
+        if not all(col in self.df.columns for col in self.feature_columns):
+            missing_cols = [col for col in self.feature_columns if col not in self.df.columns]
+            raise ValueError(f"Missing required feature columns: {missing_cols}")
         
-        for i in range(1, 7):
-            y = self.df[f'num{i}']
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-            scaler = StandardScaler()
-            X_train_scaled = scaler.fit_transform(X_train)
-            X_test_scaled = scaler.transform(X_test)
+        try:
+            X = self.df[self.feature_columns].fillna(self.df[self.feature_columns].mean())
             
-            # Create an ensemble of models
-            model1 = XGBRegressor(random_state=42)
-            model2 = RandomForestRegressor(random_state=42)
-            model3 = GradientBoostingRegressor(random_state=42)
+            # Create base models with better parameters
+            base_xgb = XGBRegressor(
+                n_estimators=100,
+                learning_rate=0.1,
+                max_depth=6,
+                n_jobs=-1,  # Use all CPU cores
+                early_stopping_rounds=10
+            )
             
-            ensemble = VotingRegressor([('xgb', model1), ('rf', model2), ('gb', model3)])
+            base_rf = RandomForestRegressor(
+                n_estimators=100,
+                max_depth=10,
+                n_jobs=-1
+            )
             
-            # Remove rows with NaN values in y_train
-            mask = ~np.isnan(y_train)
-            X_train_scaled = X_train_scaled[mask]
-            y_train = y_train[mask]
-
-            ensemble.fit(X_train_scaled, y_train)
+            base_gb = GradientBoostingRegressor(
+                n_estimators=100,
+                learning_rate=0.1,
+                max_depth=6
+            )
             
-            self.models.append(ensemble)
-            self.scalers.append(scaler)
+            self.models = []
+            self.scalers = []
             
-            train_predictions = ensemble.predict(X_train_scaled)
-            test_predictions = ensemble.predict(X_test_scaled)
-            train_mse = mean_squared_error(y_train, train_predictions)
-            test_mse = mean_squared_error(y_test, test_predictions)
-            logging.info(f"Model {i} - Train MSE: {train_mse:.4f}, Test MSE: {test_mse:.4f}")
+            for i in range(1, 7):
+                y = self.df[f'num{i}']
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X, y, test_size=0.2, random_state=42
+                )
+                
+                # Scale features
+                scaler = StandardScaler()
+                X_train_scaled = scaler.fit_transform(X_train)
+                X_test_scaled = scaler.transform(X_test)
+                
+                # Remove NaN values
+                mask = ~np.isnan(y_train)
+                X_train_scaled = X_train_scaled[mask]
+                y_train = y_train[mask]
+                
+                # Create and train ensemble
+                ensemble = VotingRegressor([
+                    ('xgb', base_xgb),
+                    ('rf', base_rf),
+                    ('gb', base_gb)
+                ], n_jobs=-1)
+                
+                ensemble.fit(X_train_scaled, y_train)
+                
+                self.models.append(ensemble)
+                self.scalers.append(scaler)
+                
+                # Calculate and log metrics
+                train_mse = mean_squared_error(y_train, ensemble.predict(X_train_scaled))
+                test_mse = mean_squared_error(y_test, ensemble.predict(X_test_scaled))
+                logging.info(f"Model {i} - Train MSE: {train_mse:.4f}, Test MSE: {test_mse:.4f}")
+        except Exception as e:
+            logging.error(f"Error in train_models: {str(e)}")
+            raise
 
     def generate_predictions(self, next_draw_features: pd.DataFrame) -> np.ndarray:
-        
         """
-        Generate predictions for the next lottery draw.
-
-        Args:
-            next_draw_features (pd.DataFrame): Features for the next draw.
-
-        Returns:
-            np.ndarray: An array of predicted numbers for the next draw.
+        Optimized prediction generation with numpy operations and error handling.
         """
         self._validate_models_and_features(next_draw_features)
-
-        top_num = [6, 10, 22, 25, 13, 14, 34, 19, 43, 2, 1, 54, 9, 3, 8, 5, 53, 56, 16, 15, 50, 55, 46, 38, 47, 17, 11, 45, 29]
-        predictions = []
-
+        
+        top_num = np.array([6, 10, 22, 25, 13, 14, 34, 19, 43, 2, 1, 54, 9, 3, 8, 
+                            5, 53, 56, 16, 15, 50, 55, 46, 38, 47, 17, 11, 45, 29])
+        
+        predictions = np.zeros(6)
+        used_numbers = set()
+        
         for i in range(6):
-            scaled_features = self.scalers[i].transform(next_draw_features)
-            pred = self.models[i].predict(scaled_features)[0]
-            
-            # Prioritize top numbers
-            if pred in top_num and pred not in predictions:
-                predictions.append(pred)
-            else:
-                # Find the closest top number to the prediction that is not already in predictions
-                closest_top_num = min([num for num in top_num if num not in predictions], key=lambda x: abs(x - pred), default=None)
-                if closest_top_num is not None:
-                    predictions.append(closest_top_num)
+            try:
+                scaled_features = self.scalers[i].transform(next_draw_features)
+                pred = self.models[i].predict(scaled_features)[0]
+                
+                # Ensure prediction is within valid range
+                pred = np.clip(pred, 1, 58)
+                
+                # Vectorized operations with validation
+                mask = ~np.isin(top_num, list(used_numbers))
+                if pred in top_num and pred not in used_numbers:
+                    predictions[i] = pred
+                    used_numbers.add(pred)
                 else:
-                    # If all top numbers are already in predictions, use the original prediction
-                    predictions.append(pred)
-
-        return np.array(predictions)
+                    available_top = top_num[mask]
+                    if len(available_top) > 0:
+                        closest_idx = np.abs(available_top - pred).argmin()
+                        predictions[i] = available_top[closest_idx]
+                        used_numbers.add(available_top[closest_idx])
+                    else:
+                        # Find any valid number not used yet
+                        available_nums = set(range(1, 59)) - used_numbers
+                        predictions[i] = min(available_nums, key=lambda x: abs(x - pred))
+                        used_numbers.add(predictions[i])
+            except Exception as e:
+                logging.error(f"Error generating prediction {i+1}: {str(e)}")
+                raise
+        
+        return np.sort(predictions)  # Return sorted predictions
 
     def _find_next_available_number(self, existing_numbers: list, top_numbers: list, start: int = 1) -> int:
         """

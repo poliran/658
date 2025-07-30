@@ -1,0 +1,26 @@
+data:
+  validation:
+    required_columns:
+      - LOTTO_GAME
+      - COMBINATIONS
+      - DRAW_DATE
+    
+models:
+  xgboost:
+    n_estimators: 100
+    learning_rate: 0.1
+    max_depth: 6
+    early_stopping_rounds: 10
+    
+  random_forest:
+    n_estimators: 100
+    max_depth: 10
+    
+  gradient_boosting:
+    n_estimators: 100
+    learning_rate: 0.1
+    max_depth: 6
+
+prediction:
+  top_numbers: [6, 10, 22, 25, 13, 14, 34, 19, 43, 2, 1, 54, 9, 3, 8, 
+                5, 53, 56, 16, 15, 50, 55, 46, 38, 47, 17, 11, 45, 29] 

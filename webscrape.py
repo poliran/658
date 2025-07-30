@@ -30,8 +30,8 @@ form_data = {
     "ctl00$ctl00$cphContainer$cpContent$ddlStartMonth": "January",
     "ctl00$ctl00$cphContainer$cpContent$ddlStartDate": "1",
     "ctl00$ctl00$cphContainer$cpContent$ddlStartYear": "2015",
-    "ctl00$ctl00$cphContainer$cpContent$ddlEndMonth": "January",
-    "ctl00$ctl00$cphContainer$cpContent$ddlEndDay": "4",
+    "ctl00$ctl00$cphContainer$cpContent$ddlEndMonth": "July",
+    "ctl00$ctl00$cphContainer$cpContent$ddlEndDay": "29",
     "ctl00$ctl00$cphContainer$cpContent$ddlEndYear": "2025",
     "ctl00$ctl00$cphContainer$cpContent$ddlSelectGame": "18",  # change for games played
     "__EVENTTARGET": "ctl00$ctl00$cphContainer$cpContent$btnSearch",
