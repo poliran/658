@@ -1,18 +1,26 @@
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup
+import time
 
 # URL of the website to scrape
 url = "https://www.pcso.gov.ph/SearchLottoResult.aspx"
 
 # Set up headers to mimic a browser
 headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
-    "Referer": url,
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
 }
 
 # Create a session
 session = requests.Session()
+
+# Add a delay to avoid being flagged as a bot
+time.sleep(2)
 
 # Send a GET request with headers to see if we can get the initial page
 response = session.get(url, headers=headers)
@@ -30,8 +38,8 @@ form_data = {
     "ctl00$ctl00$cphContainer$cpContent$ddlStartMonth": "January",
     "ctl00$ctl00$cphContainer$cpContent$ddlStartDate": "1",
     "ctl00$ctl00$cphContainer$cpContent$ddlStartYear": "2015",
-    "ctl00$ctl00$cphContainer$cpContent$ddlEndMonth": "August",
-    "ctl00$ctl00$cphContainer$cpContent$ddlEndDay": "15",
+    "ctl00$ctl00$cphContainer$cpContent$ddlEndMonth": "October",
+    "ctl00$ctl00$cphContainer$cpContent$ddlEndDay": "6",
     "ctl00$ctl00$cphContainer$cpContent$ddlEndYear": "2025",
     "ctl00$ctl00$cphContainer$cpContent$ddlSelectGame": "18",  # change for games played
     "__EVENTTARGET": "ctl00$ctl00$cphContainer$cpContent$btnSearch",
