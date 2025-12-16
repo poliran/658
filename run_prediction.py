@@ -28,9 +28,15 @@ def main():
         # Generate predictions
         logging.info("Generating predictions...")
         next_draw_features = predictor.data_processor.prepare_next_draw_features()
-        predictions = predictor.predict(next_draw_features)
+        predictions = predictor.predict(next_draw_features, use_improved_strategy=True)
         
         logging.info(f"Predicted numbers for next draw: {sorted(predictions)}")
+        
+        # Show additional prediction sets
+        logging.info("Generating alternative predictions...")
+        multiple_predictions = predictor.predict_multiple(next_draw_features, count=3)
+        for i, pred in enumerate(multiple_predictions[1:], 2):  # Skip first as it's similar to main
+            logging.info(f"Alternative set {i}: {sorted(pred)}")
         
     except LotteryPredictionError as e:
         logging.error(f"Prediction system error: {e.message}")

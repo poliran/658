@@ -75,7 +75,7 @@ class LotteryPredictor:
         except Exception as e:
             raise PredictionError(f"Unique prediction generation failed: {str(e)}")
     
-    def predict(self, features: np.ndarray) -> np.ndarray:
+    def predict(self, features: np.ndarray, use_improved_strategy: bool = True) -> np.ndarray:
         """Generate predictions for next draw."""
         if not self.models:
             raise PredictionError("Models not trained yet")
@@ -84,17 +84,28 @@ class LotteryPredictor:
         DataValidator.validate_features(features)
         
         try:
-            predictions = []
-            used_numbers = set()
-            
-            for model, scaler in self.models:
-                pred = self._generate_unique_prediction(
-                    model, scaler, features, used_numbers
+            if use_improved_strategy:
+                from .improved_prediction_strategy import ImprovedPredictionStrategy
+                
+                strategy = ImprovedPredictionStrategy(self.lottery_type)
+                result = strategy.predict_ensemble(
+                    self.models, 
+                    features, 
+                    self.data_processor.data
                 )
-                predictions.append(pred)
-                used_numbers.add(pred)
-            
-            result = np.sort(predictions)
+            else:
+                # Fallback to original method
+                predictions = []
+                used_numbers = set()
+                
+                for model, scaler in self.models:
+                    pred = self._generate_unique_prediction(
+                        model, scaler, features, used_numbers
+                    )
+                    predictions.append(pred)
+                    used_numbers.add(pred)
+                
+                result = np.sort(predictions)
             
             # Validate output predictions
             from .validators import ModelValidator
@@ -102,4 +113,16 @@ class LotteryPredictor:
             
             return result
         except Exception as e:
-            raise PredictionError(f"Prediction failed: {str(e)}") 
+            raise PredictionError(f"Prediction failed: {str(e)}")
+    
+    def predict_multiple(self, features: np.ndarray, count: int = 5) -> List[np.ndarray]:
+        """Generate multiple diverse prediction sets."""
+        from .improved_prediction_strategy import ImprovedPredictionStrategy
+        
+        strategy = ImprovedPredictionStrategy(self.lottery_type)
+        return strategy.generate_multiple_predictions(
+            self.models, 
+            features, 
+            self.data_processor.data,
+            count
+        ) 

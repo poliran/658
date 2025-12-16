@@ -15,6 +15,7 @@ class DataProcessor:
         self.lottery_type = lottery_type
         self.lottery_config = LotteryConstants.get_config(lottery_type)
         self.last_features = None
+        self.data = None  # Store loaded data
         
     def load_data(self, file_path: str) -> pd.DataFrame:
         """Load and validate lottery data."""
@@ -29,7 +30,9 @@ class DataProcessor:
             required_columns = self.config['data']['validation']['required_columns']
             DataValidator.validate_dataframe(df, required_columns)
             
-            return self._preprocess_data(df)
+            # Store data for later use
+            self.data = self._preprocess_data(df)
+            return self.data
         except Exception as e:
             raise DataProcessingError(f"Data loading failed: {str(e)}")
     
