@@ -1,5 +1,7 @@
 """Model evaluation script."""
 from src.predictor import LotteryPredictor, ModelEvaluator
+from src.predictor.constants import FilePaths, DEFAULT_LOTTERY
+from src.predictor.exceptions import LotteryPredictionError
 import logging
 import json
 
@@ -9,7 +11,7 @@ def main():
     """Run model evaluation."""
     try:
         # Initialize components
-        predictor = LotteryPredictor('config/model_config.yaml')
+        predictor = LotteryPredictor(FilePaths.DEFAULT_CONFIG_FILE, DEFAULT_LOTTERY)
         evaluator = ModelEvaluator()
         
         logging.info("Starting model evaluation...")
@@ -17,7 +19,7 @@ def main():
         # Perform backtesting
         results = evaluator.backtest_model(
             predictor, 
-            'data/lottery_history.csv', 
+            FilePaths.DEFAULT_DATA_FILE, 
             test_size=20
         )
         
@@ -38,8 +40,13 @@ def main():
         
         logging.info("Results saved to evaluation_results.json")
         
+    except LotteryPredictionError as e:
+        logging.error(f"Evaluation failed: {e.message}")
+        if e.details:
+            logging.error(f"Details: {e.details}")
+        raise
     except Exception as e:
-        logging.error(f"Evaluation failed: {str(e)}")
+        logging.error(f"Unexpected error: {str(e)}")
         raise
 
 if __name__ == "__main__":
