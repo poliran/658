@@ -1,9 +1,9 @@
 data:
   validation:
     required_columns:
-      - LOTTO_GAME
+      - LOTTO GAME
       - COMBINATIONS
-      - DRAW_DATE
+      - DRAW DATE
     
 models:
   xgboost:

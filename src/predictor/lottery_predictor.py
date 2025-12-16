@@ -30,8 +30,29 @@ class LotteryPredictor:
             model, scaler = self.model_trainer.train(X, y[:, i])
             self.models.append((model, scaler))
     
+    def _generate_unique_prediction(self, model, scaler, features: np.ndarray, 
+                                  used_numbers: set) -> int:
+        """Generate a unique prediction avoiding already used numbers."""
+        features_scaled = scaler.transform(features)
+        prediction = model.predict(features_scaled)[0]
+        
+        # Round to nearest integer and ensure it's in valid range
+        predicted_num = max(1, min(58, round(prediction)))
+        
+        # If number already used, find closest unused number
+        if predicted_num in used_numbers:
+            for offset in range(1, 59):
+                for candidate in [predicted_num + offset, predicted_num - offset]:
+                    if 1 <= candidate <= 58 and candidate not in used_numbers:
+                        return candidate
+        
+        return predicted_num
+    
     def predict(self, features: np.ndarray) -> np.ndarray:
         """Generate predictions for next draw."""
+        if not self.models:
+            raise ValueError("Models not trained yet")
+            
         predictions = []
         used_numbers = set()
         
