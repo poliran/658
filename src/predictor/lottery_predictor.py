@@ -75,7 +75,8 @@ class LotteryPredictor:
         except Exception as e:
             raise PredictionError(f"Unique prediction generation failed: {str(e)}")
     
-    def predict(self, features: np.ndarray, use_improved_strategy: bool = True) -> np.ndarray:
+    def predict(self, features: np.ndarray, use_improved_strategy: bool = True, 
+                optimize_sharing: bool = False) -> np.ndarray:
         """Generate predictions for next draw."""
         if not self.models:
             raise PredictionError("Models not trained yet")
@@ -91,7 +92,8 @@ class LotteryPredictor:
                 result = strategy.predict_ensemble(
                     self.models, 
                     features, 
-                    self.data_processor.data
+                    self.data_processor.data,
+                    optimize_sharing=optimize_sharing
                 )
             else:
                 # Fallback to original method
@@ -114,6 +116,13 @@ class LotteryPredictor:
             return result
         except Exception as e:
             raise PredictionError(f"Prediction failed: {str(e)}")
+    
+    def predict_anti_popular(self, features: np.ndarray, count: int = 1) -> List[np.ndarray]:
+        """Generate predictions optimized to minimize jackpot sharing."""
+        from .jackpot_optimizer import JackpotSharingOptimizer
+        
+        optimizer = JackpotSharingOptimizer(self.lottery_type)
+        return optimizer.generate_anti_popular_prediction(count)
     
     def predict_multiple(self, features: np.ndarray, count: int = 5) -> List[np.ndarray]:
         """Generate multiple diverse prediction sets."""

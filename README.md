@@ -7,6 +7,7 @@ A production-ready machine learning system for analyzing and predicting lottery 
 - Historical lottery data analysis (1,365+ draws)
 - Ensemble machine learning models (XGBoost, Random Forest, Gradient Boosting)
 - Feature engineering based on number frequencies and patterns
+- **Game-theoretic jackpot sharing optimization**
 - Configurable model parameters via YAML
 - Comprehensive testing and evaluation framework
 - Clean, modular architecture
@@ -59,6 +60,19 @@ predictions = predictor.predict(features)
 print(f"Predicted numbers: {sorted(predictions)}")
 ```
 
+### Jackpot Sharing Optimization
+
+```python
+# Optimize for minimal jackpot sharing (game theory)
+optimized = predictor.predict(features, optimize_sharing=True)
+print(f"Optimized numbers: {sorted(optimized)}")
+
+# Generate anti-popular predictions
+anti_popular = predictor.predict_anti_popular(features, count=3)
+for i, pred in enumerate(anti_popular, 1):
+    print(f"Anti-popular set {i}: {sorted(pred)}")
+```
+
 ### Command Line
 
 ```bash
@@ -67,6 +81,9 @@ python run_prediction.py
 
 # Evaluate model performance
 python evaluate_model.py
+
+# Jackpot sharing optimization analysis
+python run_jackpot_optimization.py
 ```
 
 ## Project Structure
@@ -115,6 +132,7 @@ make clean
 
 - [Project Structure](docs/PROJECT_STRUCTURE.md)
 - [Implementation Summary](docs/COMPLETION_SUMMARY.md)
+- [Jackpot Optimization](docs/JACKPOT_OPTIMIZATION.md)
 
 ## Disclaimer
 

@@ -14,7 +14,7 @@ class ImprovedPredictionStrategy:
         self.number_range = LotteryConstants.get_number_range(lottery_type)
         
     def predict_ensemble(self, models: List, features: np.ndarray, 
-                        historical_data: pd.DataFrame) -> np.ndarray:
+                        historical_data: pd.DataFrame, optimize_sharing: bool = False) -> np.ndarray:
         """Generate predictions using ensemble of strategies."""
         
         # Strategy 1: Model-based predictions
@@ -36,6 +36,24 @@ class ImprovedPredictionStrategy:
             'pattern': (pattern_predictions, 0.2),
             'hot_cold': (hot_cold_predictions, 0.15)
         })
+        
+        # Apply jackpot sharing optimization if requested
+        if optimize_sharing:
+            from .jackpot_optimizer import JackpotSharingOptimizer
+            optimizer = JackpotSharingOptimizer(self.lottery_type)
+            
+            # Generate multiple candidates and optimize
+            candidates = [combined]
+            for _ in range(4):  # Generate 4 additional candidates
+                candidate = self._combine_strategies({
+                    'model': (model_predictions, 0.4),
+                    'frequency': (freq_predictions, 0.25),
+                    'pattern': (pattern_predictions, 0.2),
+                    'hot_cold': (hot_cold_predictions, 0.15)
+                })
+                candidates.append(candidate)
+            
+            combined = optimizer.optimize_selection(candidates, historical_data)
         
         return combined
     
