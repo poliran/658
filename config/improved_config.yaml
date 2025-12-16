@@ -1,10 +1,15 @@
+lottery:
+  min_number: 1
+  max_number: 58
+  numbers_per_draw: 6
+
 data:
   validation:
     required_columns:
       - LOTTO GAME
       - COMBINATIONS
       - DRAW DATE
-    
+
 models:
   xgboost:
     n_estimators: 100
@@ -22,4 +27,5 @@ models:
     max_depth: 6
 
 prediction:
-  top_numbers: [6, 10, 22, 25, 13, 14, 34, 19, 43, 2, 1, 54, 9, 3, 8] 
+  strategy: "unique"  # or "top_k"
+  confidence_threshold: 0.7
