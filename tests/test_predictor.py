@@ -4,7 +4,8 @@ import numpy as np
 import pandas as pd
 import tempfile
 import os
-from src.predictor import LotteryPredictor, DataProcessor, ModelTrainer
+from src.predictor import PredictionService, DataProcessor, ModelTrainer
+from src.predictor.system_factory import PredictionSystemFactory
 from src.predictor.constants import ColumnNames, DEFAULT_LOTTERY
 
 class TestDataProcessor(unittest.TestCase):
@@ -73,12 +74,16 @@ class TestModelTrainer(unittest.TestCase):
         ensemble = self.trainer.create_ensemble()
         self.assertEqual(len(ensemble.estimators), 3)
 
-class TestLotteryPredictor(unittest.TestCase):
-    """Test main predictor functionality."""
-    
+class TestPredictionService(unittest.TestCase):
+    """Test PredictionService via PredictionSystemFactory."""
+
     def setUp(self):
-        # Create temporary config file
         self.config_data = f"""
+lottery:
+  min_number: 1
+  max_number: 58
+  numbers_per_draw: 6
+
 data:
   validation:
     required_columns:
@@ -102,51 +107,51 @@ models:
         self.config_file = tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False)
         self.config_file.write(self.config_data)
         self.config_file.close()
-        
-        # Create temporary data file with sufficient rows and valid combinations
+
         data_rows = []
-        for i in range(55):  # Create 55 rows for sufficient training data
-            # Generate valid lottery combinations
-            nums = [(i + j) % 58 + 1 for j in range(6)]  # Ensure numbers are 1-58
+        for i in range(55):
+            nums = [(i + j) % 58 + 1 for j in range(6)]
             combo = "-".join([f"{n:02d}" for n in nums])
-            # Use valid dates (month/day format)
             month = (i % 12) + 1
             day = (i % 28) + 1
             data_rows.append(f"Ultra Lotto 6/58,{combo},{month}/{day}/2024,50000000,0")
-        
-        self.data = f"""{ColumnNames.LOTTO_GAME},{ColumnNames.COMBINATIONS},{ColumnNames.DRAW_DATE},{ColumnNames.JACKPOT},{ColumnNames.WINNERS}
-""" + "\n".join(data_rows)
-        
+
+        self.data = (
+            f"{ColumnNames.LOTTO_GAME},{ColumnNames.COMBINATIONS},"
+            f"{ColumnNames.DRAW_DATE},{ColumnNames.JACKPOT},{ColumnNames.WINNERS}\n"
+            + "\n".join(data_rows)
+        )
         self.data_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
         self.data_file.write(self.data)
         self.data_file.close()
-    
+
     def tearDown(self):
         os.unlink(self.config_file.name)
         os.unlink(self.data_file.name)
-    
-    def test_predictor_initialization(self):
-        """Test predictor initialization."""
-        predictor = LotteryPredictor(self.config_file.name, DEFAULT_LOTTERY)
-        self.assertIsNotNone(predictor.config)
-        self.assertIsNotNone(predictor.data_processor)
-        self.assertIsNotNone(predictor.model_trainer)
-    
+
+    def test_service_initialization(self):
+        """PredictionSystemFactory produces a PredictionService."""
+        service = PredictionSystemFactory.create_lottery_predictor(self.config_file.name)
+        self.assertIsInstance(service, PredictionService)
+
     def test_prediction_output_format(self):
-        """Test prediction output format."""
-        predictor = LotteryPredictor(self.config_file.name, DEFAULT_LOTTERY)
-        predictor.train(self.data_file.name)
-        
-        features = predictor.data_processor.prepare_next_draw_features()
-        predictions = predictor.predict(features)
-        
-        expected_count = predictor.lottery_config["numbers_per_draw"]
-        max_number = predictor.lottery_config["max_number"]
-        min_number = predictor.lottery_config["min_number"]
-        
-        self.assertEqual(len(predictions), expected_count)
-        self.assertTrue(all(min_number <= p <= max_number for p in predictions))
-        self.assertEqual(len(set(predictions)), expected_count)  # All unique
+        """predict() returns correct count of unique numbers in valid range."""
+        service = PredictionSystemFactory.create_lottery_predictor(self.config_file.name)
+        service.train(self.data_file.name, model_config={})
+
+        features = service.prepare_features(self.data_file.name)
+        predictions = service.predict(features)
+
+        self.assertEqual(len(predictions), service.config.numbers_per_draw)
+        self.assertTrue(all(service.config.min_number <= p <= service.config.max_number for p in predictions))
+        self.assertEqual(len(set(predictions)), service.config.numbers_per_draw)
+
+    def test_predict_requires_training(self):
+        """predict() raises before train() is called."""
+        service = PredictionSystemFactory.create_lottery_predictor(self.config_file.name)
+        features = np.zeros((1, 10))
+        with self.assertRaises(ValueError):
+            service.predict(features)
 
 if __name__ == '__main__':
     unittest.main()

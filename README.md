@@ -18,14 +18,17 @@ A production-ready machine learning system for analyzing and predicting lottery 
 # Install dependencies
 pip install -r requirements.txt
 
-# Train models (required before prediction)
-python -c "from src.predictor import LotteryPredictor; p = LotteryPredictor('config/model_config.yaml'); p.train('data/lottery_history.csv')"
+# Generate predictions
+python cli.py predict
 
-# Run prediction
-python run_prediction.py
+# Jackpot-sharing optimized predictions
+python cli.py optimize
+
+# Full summary report
+python cli.py report
 
 # Evaluate model performance
-python evaluate_model.py
+python cli.py evaluate
 
 # Run tests
 make test
@@ -49,29 +52,20 @@ make test
 ### Basic Prediction
 
 ```python
-from src.predictor import LotteryPredictor
+from src.predictor import PredictionSystemFactory
 
-# Initialize predictor
-predictor = LotteryPredictor('config/model_config.yaml')
+service = PredictionSystemFactory.create_lottery_predictor('config/model_config.yaml')
+service.train('data/lottery_history.csv', model_config={})
 
-# Train models
-predictor.train('data/lottery_history.csv')
-
-# Generate predictions
-features = predictor.data_processor.prepare_next_draw_features()
-predictions = predictor.predict(features)
-print(f"Predicted numbers: {sorted(predictions)}")
+features = service.prepare_features('data/lottery_history.csv')
+print(f"Predicted numbers: {sorted(service.predict(features))}")
+print(f"Optimized numbers: {sorted(service.predict_optimized(features))}")
 ```
 
 ### Jackpot Sharing Optimization
 
 ```python
-# Optimize for minimal jackpot sharing (game theory)
-optimized = predictor.predict(features, optimize_sharing=True)
-print(f"Optimized numbers: {sorted(optimized)}")
-
-# Generate anti-popular predictions
-anti_popular = predictor.predict_anti_popular(features, count=3)
+anti_popular = service.predict_anti_popular(features, count=3)
 for i, pred in enumerate(anti_popular, 1):
     print(f"Anti-popular set {i}: {sorted(pred)}")
 ```
@@ -79,14 +73,10 @@ for i, pred in enumerate(anti_popular, 1):
 ### Command Line
 
 ```bash
-# Generate predictions
-python run_prediction.py
-
-# Evaluate model performance
-python evaluate_model.py
-
-# Jackpot sharing optimization analysis
-python run_jackpot_optimization.py
+python cli.py predict    # Standard + optimized predictions
+python cli.py optimize   # Jackpot-sharing optimized + anti-popular sets
+python cli.py report     # Full summary report
+python cli.py evaluate   # Model performance evaluation
 ```
 
 ## Project Structure
