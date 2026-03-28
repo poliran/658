@@ -26,6 +26,7 @@ class SklearnModelFactory(ModelFactory):
             n_estimators=config.get('n_estimators', 100),
             learning_rate=config.get('learning_rate', 0.1),
             max_depth=config.get('max_depth', 6),
+            tree_method='hist',
             random_state=42
         )
     

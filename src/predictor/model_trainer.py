@@ -22,6 +22,7 @@ class ModelTrainer:
             n_estimators=params.get('n_estimators', ModelDefaults.XGBOOST['n_estimators']),
             learning_rate=params.get('learning_rate', ModelDefaults.XGBOOST['learning_rate']),
             max_depth=params.get('max_depth', ModelDefaults.XGBOOST['max_depth']),
+            tree_method='hist',
             random_state=ModelDefaults.RANDOM_STATE
         )
     

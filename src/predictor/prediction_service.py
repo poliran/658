@@ -1,8 +1,11 @@
 """PredictionService — clean DI-based predictor (replaces ImprovedLotteryPredictor)."""
+import os
 import numpy as np
 import pandas as pd
+import joblib
 from typing import List, Tuple, Dict
 from sklearn.preprocessing import StandardScaler
+from xgboost import XGBRegressor
 
 from .interfaces import DataLoader, DataValidator, FeatureEngineer, ModelFactory, PredictionStrategy, LotteryConfig
 
@@ -101,6 +104,41 @@ class PredictionService:
     def _assert_optimizer(self) -> None:
         if self.optimizer is None:
             raise ValueError("No optimizer injected into PredictionService.")
+
+    # ------------------------------------------------------------------
+    # Persistence
+    # ------------------------------------------------------------------
+
+    def save(self, directory: str) -> None:
+        """Persist models to directory. XGBoost saved as .json, others via joblib."""
+        self._assert_trained()
+        os.makedirs(directory, exist_ok=True)
+        for i, (model, scaler) in enumerate(self.models):
+            if isinstance(model, XGBRegressor):
+                model.save_model(os.path.join(directory, f"model_{i}.json"))
+            else:
+                joblib.dump(model, os.path.join(directory, f"model_{i}.joblib"))
+            joblib.dump(scaler, os.path.join(directory, f"scaler_{i}.joblib"))
+
+    def load(self, directory: str) -> None:
+        """Restore models saved by save()."""
+        self.models = []
+        i = 0
+        while True:
+            json_path = os.path.join(directory, f"model_{i}.json")
+            joblib_path = os.path.join(directory, f"model_{i}.joblib")
+            scaler_path = os.path.join(directory, f"scaler_{i}.joblib")
+            if not os.path.exists(scaler_path):
+                break
+            if os.path.exists(json_path):
+                model = XGBRegressor()
+                model.load_model(json_path)
+            else:
+                model = joblib.load(joblib_path)
+            scaler = joblib.load(scaler_path)
+            self.models.append((model, scaler))
+            i += 1
+        self.is_trained = bool(self.models)
 
     def _process_dates(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
