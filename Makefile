@@ -7,7 +7,7 @@ install:
 # Install in development mode
 install-dev:
 	pip install -e .
-	pip install pytest pytest-cov black flake8
+	pip install -r requirements-dev.txt
 
 # Run tests
 test:

@@ -18,6 +18,9 @@ A production-ready machine learning system for analyzing and predicting lottery 
 # Install dependencies
 pip install -r requirements.txt
 
+# Train models (required before prediction)
+python -c "from src.predictor import LotteryPredictor; p = LotteryPredictor('config/model_config.yaml'); p.train('data/lottery_history.csv')"
+
 # Run prediction
 python run_prediction.py
 

@@ -20,15 +20,15 @@ class DataProcessor:
     def load_data(self, file_path: str) -> pd.DataFrame:
         """Load and validate lottery data."""
         try:
-            # Comprehensive file validation
-            validated_path = DataValidator.validate_file_path(file_path)
+            # Comprehensive file validation (CSV/Excel only for data files)
+            validated_path = DataValidator.validate_file_path(file_path, allowed_extensions=['.csv', '.xlsx'])
             
             # Load data with validation
             df = pd.read_csv(validated_path)
             
             # Validate data structure and content
             required_columns = self.config['data']['validation']['required_columns']
-            DataValidator.validate_dataframe(df, required_columns)
+            DataValidator.validate_dataframe(df, required_columns, self.lottery_type)
             
             # Store data for later use
             self.data = self._preprocess_data(df)

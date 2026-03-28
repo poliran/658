@@ -42,7 +42,7 @@ def safe_execute(func, *args, error_class=LotteryPredictionError, **kwargs):
     except Exception as e:
         raise error_class(
             f"Failed to execute {func.__name__}: {str(e)}",
-            details={"function": func.__name__, "args": args, "kwargs": kwargs}
+            details={"function": func.__name__, "args": str(args)[:200], "kwargs": str(list(kwargs.keys()))}
         ) from e
 
 def validate_input(value: Any, validator_func, error_message: str):

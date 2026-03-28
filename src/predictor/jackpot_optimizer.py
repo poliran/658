@@ -167,14 +167,9 @@ class JackpotSharingOptimizer:
         return list(set(patterns))
     
     def _generate_sequences(self) -> List[int]:
-        """Generate commonly chosen sequential numbers."""
-        sequences = []
-        
-        # Consecutive sequences of 3+
-        for start in range(1, 56):
-            sequences.extend(range(start, min(start + 3, 59)))
-        
-        return list(set(sequences))
+        """Generate anchor numbers of commonly chosen sequential runs (e.g. 1-2-3)."""
+        # Only the starting anchors of the most popular sequential picks
+        return list(range(1, 10))
     
     def _generate_multiples(self) -> List[int]:
         """Generate multiples that people commonly choose."""
@@ -242,9 +237,6 @@ class JackpotSharingOptimizer:
         for i in range(count):
             # Start with least popular numbers
             base_selection = sorted_numbers[:self.lottery_config["numbers_per_draw"] + 5]
-            
-            # Add some randomness while maintaining low popularity
-            np.random.seed(42 + i)
             selected = np.random.choice(
                 base_selection, 
                 self.lottery_config["numbers_per_draw"], 

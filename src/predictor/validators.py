@@ -11,7 +11,8 @@ class DataValidator:
     """Validates input data for lottery prediction."""
     
     @staticmethod
-    def validate_file_path(file_path: Union[str, Path]) -> Path:
+    def validate_file_path(file_path: Union[str, Path],
+                           allowed_extensions: List[str] = None) -> Path:
         """Validate that file path exists and is readable."""
         if not file_path:
             raise ValidationError("File path cannot be empty")
@@ -24,7 +25,10 @@ class DataValidator:
         if not path.is_file():
             raise ValidationError(f"Path is not a file: {file_path}")
         
-        if not path.suffix.lower() in ['.csv', '.xlsx', '.json', '.yaml', '.yml']:
+        if allowed_extensions is None:
+            allowed_extensions = ['.csv', '.xlsx', '.json', '.yaml', '.yml']
+        
+        if not path.suffix.lower() in allowed_extensions:
             raise ValidationError(f"Unsupported file type: {path.suffix}")
         
         # Check file size (max 100MB)
@@ -34,7 +38,8 @@ class DataValidator:
         return path
     
     @staticmethod
-    def validate_dataframe(df: pd.DataFrame, required_columns: List[str]) -> None:
+    def validate_dataframe(df: pd.DataFrame, required_columns: List[str],
+                           lottery_type=None) -> None:
         """Validate DataFrame structure and content."""
         if df is None:
             raise ValidationError("DataFrame cannot be None")
@@ -61,14 +66,24 @@ class DataValidator:
         
         # Validate combinations format
         if ColumnNames.COMBINATIONS in df.columns:
-            DataValidator._validate_combinations_format(df[ColumnNames.COMBINATIONS])
+            if lottery_type is not None:
+                config = LotteryConstants.get_config(lottery_type)
+                DataValidator._validate_combinations_format(
+                    df[ColumnNames.COMBINATIONS],
+                    numbers_per_draw=config["numbers_per_draw"],
+                    max_number=config["max_number"]
+                )
+            else:
+                DataValidator._validate_combinations_format(df[ColumnNames.COMBINATIONS])
         
         # Validate dates
         if ColumnNames.DRAW_DATE in df.columns:
             DataValidator._validate_dates(df[ColumnNames.DRAW_DATE])
     
     @staticmethod
-    def _validate_combinations_format(combinations: pd.Series) -> None:
+    def _validate_combinations_format(combinations: pd.Series,
+                                      numbers_per_draw: int = 6,
+                                      max_number: int = 58) -> None:
         """Validate lottery combination format."""
         invalid_combinations = []
         
@@ -82,14 +97,14 @@ class DataValidator:
                 continue
             
             parts = combo.split('-')
-            if len(parts) != 6:  # Default to 6 for validation
-                invalid_combinations.append(f"Row {idx}: Expected 6 numbers, got {len(parts)}")
+            if len(parts) != numbers_per_draw:
+                invalid_combinations.append(f"Row {idx}: Expected {numbers_per_draw} numbers, got {len(parts)}")
                 continue
             
             try:
                 numbers = [int(part.strip()) for part in parts]
-                if any(n < 1 or n > 58 for n in numbers):  # Default range
-                    invalid_combinations.append(f"Row {idx}: Numbers outside range 1-58")
+                if any(n < 1 or n > max_number for n in numbers):
+                    invalid_combinations.append(f"Row {idx}: Numbers outside range 1-{max_number}")
                 if len(set(numbers)) != len(numbers):
                     invalid_combinations.append(f"Row {idx}: Duplicate numbers")
             except ValueError:
@@ -104,25 +119,20 @@ class DataValidator:
     @staticmethod
     def _validate_dates(dates: pd.Series) -> None:
         """Validate date format and range."""
-        try:
-            parsed_dates = pd.to_datetime(dates, errors='coerce')
-            invalid_dates = parsed_dates.isnull().sum()
-            
-            if invalid_dates > 0:
-                raise ValidationError(f"Invalid date format in {invalid_dates} rows")
-            
-            # Check date range (should be reasonable)
-            min_date = parsed_dates.min()
-            max_date = parsed_dates.max()
-            
-            if min_date.year < 2000:
-                raise ValidationError(f"Dates too old: earliest date is {min_date}")
-            
-            if max_date > pd.Timestamp.now() + pd.Timedelta(days=1):
-                raise ValidationError(f"Future dates found: latest date is {max_date}")
-                
-        except Exception as e:
-            raise ValidationError(f"Date validation failed: {str(e)}")
+        parsed_dates = pd.to_datetime(dates, errors='coerce')
+        invalid_dates = parsed_dates.isnull().sum()
+        
+        if invalid_dates > 0:
+            raise ValidationError(f"Invalid date format in {invalid_dates} rows")
+        
+        min_date = parsed_dates.min()
+        max_date = parsed_dates.max()
+        
+        if min_date.year < 2000:
+            raise ValidationError(f"Dates too old: earliest date is {min_date}")
+        
+        if max_date > pd.Timestamp.now() + pd.Timedelta(days=1):
+            raise ValidationError(f"Future dates found: latest date is {max_date}")
     
     @staticmethod
     def validate_lottery_numbers(numbers: List[int], lottery_type: LotteryType = LotteryType.ULTRA_LOTTO_6_58) -> None:

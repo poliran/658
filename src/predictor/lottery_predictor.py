@@ -5,7 +5,7 @@ import yaml
 from .data_processor import DataProcessor
 from .model_trainer import ModelTrainer
 from .constants import LotteryConstants, DEFAULT_LOTTERY, FilePaths
-from .exceptions import PredictionError, ConfigurationError
+from .exceptions import PredictionError, ConfigurationError, ValidationError
 from .validators import DataValidator
 
 class LotteryPredictor:

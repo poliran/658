@@ -1,0 +1,25 @@
+{
+  "name": "Lottery Predictor",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": "..",
+    "target": "builder"
+  },
+  "workspaceFolder": "/app",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind",
+  "postCreateCommand": "pip install -r requirements-dev.txt && pip install -e .",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.black-formatter",
+        "ms-python.flake8"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/opt/venv/bin/python",
+        "editor.formatOnSave": true,
+        "python.formatting.provider": "black"
+      }
+    }
+  }
+}

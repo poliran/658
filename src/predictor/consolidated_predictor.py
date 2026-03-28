@@ -35,15 +35,18 @@ class ConsolidatedPredictor:
         if not self.is_trained:
             raise ValueError("System not trained. Call train() first.")
         
-        results = {
-            'basic': self._get_basic_predictions(),
-            'advanced': self._get_advanced_predictions(),
-            'optimized': self._get_optimized_predictions(),
-            'analysis': self._get_prediction_analysis(),
-            'recommendations': self._get_recommendations()
-        }
+        basic = self._get_basic_predictions()
+        advanced = self._get_advanced_predictions()
+        optimized = self._get_optimized_predictions()
+        analysis = self._get_prediction_analysis(basic, advanced)
         
-        return results
+        return {
+            'basic': basic,
+            'advanced': advanced,
+            'optimized': optimized,
+            'analysis': analysis,
+            'recommendations': self._get_recommendations(analysis, optimized)
+        }
     
     def _get_basic_predictions(self) -> Dict[str, np.ndarray]:
         """Get basic prediction methods."""
@@ -89,14 +92,12 @@ class ConsolidatedPredictor:
             'strategy_comparison': self.optimizer.compare_strategies(candidates)
         }
     
-    def _get_prediction_analysis(self) -> Dict[str, Any]:
+    def _get_prediction_analysis(self, basic: Dict[str, np.ndarray],
+                                  advanced: Dict[str, List[np.ndarray]]) -> Dict[str, Any]:
         """Analyze all predictions for insights."""
-        basic = self._get_basic_predictions()
-        advanced = self._get_advanced_predictions()
-        
-        all_predictions = []
-        all_predictions.extend(basic.values())
-        all_predictions.extend([pred for pred_list in advanced.values() for pred in pred_list])
+        all_predictions = list(basic.values()) + [
+            pred for pred_list in advanced.values() for pred in pred_list
+        ]
         
         # Number frequency analysis
         number_freq = {}
@@ -129,11 +130,9 @@ class ConsolidatedPredictor:
             }
         }
     
-    def _get_recommendations(self) -> Dict[str, Any]:
+    def _get_recommendations(self, analysis: Dict[str, Any],
+                              optimized: Dict[str, Any]) -> Dict[str, Any]:
         """Generate consolidated recommendations."""
-        analysis = self._get_prediction_analysis()
-        optimized = self._get_optimized_predictions()
-        
         # Best overall prediction (lowest sharing risk)
         best_prediction = optimized['jackpot_optimized']
         risk_analysis = optimized['risk_analysis']
