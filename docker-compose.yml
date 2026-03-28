@@ -5,27 +5,19 @@ services:
       dockerfile: Dockerfile
     container_name: lottery-predictor
     image: lottery-predictor:latest
-    
-    # Environment and execution
+
     environment:
       PYTHONUNBUFFERED: "1"
       PYTHONDONTWRITEBYTECODE: "1"
-    
-    # Volume mounts for development and data persistence
+
     volumes:
-      # Source code for live development
       - ./src:/app/src
       - ./config:/app/config
       - ./data:/app/data
       - ./models:/app/models
-      # Scripts for easy updates
-      - ./predict.py:/app/predict.py
-      - ./run_prediction.py:/app/run_prediction.py
-      - ./evaluate_model.py:/app/evaluate_model.py
-      # Output directory for results
+      - ./cli.py:/app/cli.py
       - ./outputs:/app/outputs
-    
-    # Resource limits
+
     deploy:
       resources:
         limits:
@@ -34,44 +26,40 @@ services:
         reservations:
           cpus: '1'
           memory: 1G
-    
-    # Logging
+
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
-    
-    # Restart policy
+
     restart: no
 
-  # Optional: Development service with dev dependencies
   lottery-predictor-dev:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: lottery-predictor-dev
     image: lottery-predictor:latest
-    
+
     environment:
       PYTHONUNBUFFERED: "1"
       PYTHONDONTWRITEBYTECODE: "1"
-    
+
     volumes:
       - ./src:/app/src
       - ./config:/app/config
       - ./data:/app/data
       - ./models:/app/models
+      - ./cli.py:/app/cli.py
       - ./tests:/app/tests
-      - ./*.py:/app/
       - ./outputs:/app/outputs
       - ./requirements-dev.txt:/app/requirements-dev.txt
-    
-    # Install dev dependencies and run tests
+
     command: >
       bash -c "pip install -r requirements-dev.txt &&
                python -m pytest tests/ -v --cov=src --cov-report=html"
-    
+
     deploy:
       resources:
         limits:
@@ -80,11 +68,11 @@ services:
         reservations:
           cpus: '1'
           memory: 1G
-    
+
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
-    
+
     restart: no

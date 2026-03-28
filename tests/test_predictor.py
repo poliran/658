@@ -4,47 +4,32 @@ import numpy as np
 import pandas as pd
 import tempfile
 import os
-from src.predictor import PredictionService, DataProcessor, ModelTrainer
+from src.predictor import PredictionService, ModelTrainer
 from src.predictor.system_factory import PredictionSystemFactory
 from src.predictor.constants import ColumnNames, DEFAULT_LOTTERY
 
 class TestDataProcessor(unittest.TestCase):
-    """Test data processing functionality."""
-    
+    """Test data validation via LotteryDataValidator."""
+
     def setUp(self):
-        self.config = {
-            'data': {
-                'validation': {
-                    'required_columns': [ColumnNames.LOTTO_GAME, ColumnNames.COMBINATIONS, ColumnNames.DRAW_DATE]
-                }
-            }
-        }
-        self.processor = DataProcessor(self.config, DEFAULT_LOTTERY)
-    
+        from src.predictor.data.validators import LotteryDataValidator
+        required = [ColumnNames.LOTTO_GAME, ColumnNames.COMBINATIONS, ColumnNames.DRAW_DATE]
+        self.validator = LotteryDataValidator(required)
+
     def test_validate_data_success(self):
-        """Test successful data validation."""
-        # Create sufficient data for validation (minimum 10 rows)
-        data = []
-        for i in range(12):
-            data.append({
-                ColumnNames.LOTTO_GAME: 'Ultra Lotto 6/58',
-                ColumnNames.COMBINATIONS: f'{i+1:02d}-{i+2:02d}-{i+3:02d}-{i+4:02d}-{i+5:02d}-{i+6:02d}',
-                ColumnNames.DRAW_DATE: f'1/{i+1}/2024'
-            })
+        data = [
+            {ColumnNames.LOTTO_GAME: 'Ultra Lotto 6/58',
+             ColumnNames.COMBINATIONS: f'{i+1:02d}-{i+2:02d}-{i+3:02d}-{i+4:02d}-{i+5:02d}-{i+6:02d}',
+             ColumnNames.DRAW_DATE: f'1/{i+1}/2024'}
+            for i in range(12)
+        ]
         df = pd.DataFrame(data)
-        
-        # Use direct validation without the strict data requirements for testing
-        required_columns = self.config['data']['validation']['required_columns']
-        if not all(col in df.columns for col in required_columns):
-            self.fail("Missing required columns")
-        
-        # Should not raise for basic structure validation
-    
+        self.assertTrue(self.validator.validate(df))
+
     def test_validate_data_failure(self):
-        """Test data validation failure."""
         df = pd.DataFrame({'invalid': [1, 2, 3]})
         with self.assertRaises(Exception):
-            self.processor._validate_data(df)
+            self.validator.validate(df)
 
 class TestModelTrainer(unittest.TestCase):
     """Test model training functionality."""
