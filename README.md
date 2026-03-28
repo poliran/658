@@ -1,6 +1,6 @@
 # Lottery Prediction System
 
-A production-ready machine learning system for analyzing and predicting lottery numbers using ensemble methods.
+A production-ready machine learning system for analyzing and predicting lottery numbers using ensemble. Educational purpose.
 
 ## Features
 
