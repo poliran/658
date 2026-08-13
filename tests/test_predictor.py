@@ -127,9 +127,9 @@ models:
         features = service.prepare_features(self.data_file.name)
         predictions = service.predict(features)
 
-        self.assertEqual(len(predictions), service.config.numbers_per_draw)
-        self.assertTrue(all(service.config.min_number <= p <= service.config.max_number for p in predictions))
-        self.assertEqual(len(set(predictions)), service.config.numbers_per_draw)
+        self.assertEqual(len(predictions), service.config["numbers_per_draw"])
+        self.assertTrue(all(service.config["min_number"] <= p <= service.config["max_number"] for p in predictions))
+        self.assertEqual(len(set(predictions)), service.config["numbers_per_draw"])
 
     def test_predict_requires_training(self):
         """predict() raises before train() is called."""

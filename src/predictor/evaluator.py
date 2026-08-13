@@ -9,8 +9,47 @@ log = logging.getLogger(__name__)
 class ModelEvaluator:
     """Handles model evaluation and performance metrics."""
     
-    def __init__(self):
+    def __init__(self, config_path: str = None):
+        self.config_path = config_path
         self.evaluation_history = []
+
+    def evaluate(self, data_path: str = None) -> Dict[str, float]:
+        """Evaluate model performance on historical draw data."""
+        from .system_factory import PredictionSystemFactory
+        from .constants import FilePaths
+
+        config = self.config_path or FilePaths.DEFAULT_CONFIG_FILE
+        data = data_path or FilePaths.DEFAULT_DATA_FILE
+
+        service = PredictionSystemFactory.create_lottery_predictor(config)
+        service.train(data, model_config={})
+
+        raw = service.data_loader.load(data)
+        processed = service._process_dates(raw)
+        featured = service.feature_engineer.create_features(processed)
+
+        number_cols = [f"num_{i}" for i in range(1, service.config['numbers_per_draw'] + 1)]
+        actuals = featured[number_cols].values
+
+        feature_cols = [
+            c for c in featured.columns
+            if c.startswith("freq_") or c in ("sum_numbers", "odd_count", "low_count")
+        ]
+
+        metrics_list = []
+        eval_sample_size = min(20, len(featured) - 1)
+        for idx in range(len(featured) - eval_sample_size, len(featured) - 1):
+            row_features = featured[feature_cols].iloc[idx:idx+1].values
+            pred = service.predict(row_features)
+            act = actuals[idx + 1]
+            m = self.evaluate_predictions(act, pred)
+            metrics_list.append(m)
+
+        summary = self.generate_report(metrics_list)
+        log.info(f"Model Evaluation Summary (over {len(metrics_list)} recent draws):")
+        for k, v in summary.items():
+            log.info(f"  {k}: {v:.4f}")
+        return summary
     
     def evaluate_predictions(self, actual: np.ndarray, predicted: np.ndarray) -> Dict[str, float]:
         """Evaluate prediction accuracy.

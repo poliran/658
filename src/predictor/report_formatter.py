@@ -14,7 +14,7 @@ class ReportFormatter:
     def summary(self) -> str:
         """Generate a full summary report."""
         predictions = self.orchestrator.get_predictions()
-        n = self.orchestrator.service.config.numbers_per_draw
+        n = self.orchestrator.service.config["numbers_per_draw"]
         analysis = self.analyzer.analyze(predictions, n)
 
         optimized = predictions["optimized"]
