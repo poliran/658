@@ -1,14 +1,17 @@
 """PredictionService — clean DI-based predictor (replaces ImprovedLotteryPredictor)."""
 import os
+import logging
 import numpy as np
 import pandas as pd
 import joblib
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Any
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBRegressor
 
-from .interfaces import DataLoader, DataValidator, FeatureEngineer, ModelFactory, PredictionStrategy, LotteryConfig
+from .interfaces import DataLoader, DataValidator, FeatureEngineer, ModelFactory, PredictionStrategy
+from .constants import ColumnNames
 
+log = logging.getLogger(__name__)
 
 class PredictionService:
     """Lottery predictor with explicit dependency injection and no hidden state."""
@@ -20,7 +23,7 @@ class PredictionService:
         feature_engineer: FeatureEngineer,
         model_factory: ModelFactory,
         prediction_strategy: PredictionStrategy,
-        config: LotteryConfig,
+        config: Dict[str, Any],
         optimizer=None,
     ):
         self.data_loader = data_loader
@@ -41,6 +44,8 @@ class PredictionService:
 
     def train(self, data_source: str, model_config: Dict) -> None:
         """Load data, engineer features, and fit per-position models."""
+        log.info(f"Starting PredictionService training from {data_source}")
+        
         raw = self.data_loader.load(data_source)
         self.data_validator.validate(raw)
 
@@ -49,16 +54,19 @@ class PredictionService:
         self._training_data = featured
 
         X, y = self._prepare_training_data(featured)
-
+        
+        log.info(f"Training {self.config['numbers_per_draw']} per-position models")
         self.models = []
-        for i in range(self.config.numbers_per_draw):
+        for i in range(self.config['numbers_per_draw']):
             model = self.model_factory.create_model("ensemble", model_config)
             scaler = StandardScaler()
             X_scaled = scaler.fit_transform(X)
             model.fit(X_scaled, y[:, i])
             self.models.append((model, scaler))
+            log.debug(f"Trained model {i+1}/{self.config['numbers_per_draw']}")
 
         self.is_trained = True
+        log.info("PredictionService training completed successfully")
 
     # ------------------------------------------------------------------
     # Feature preparation (explicit — no hidden state)
@@ -113,15 +121,20 @@ class PredictionService:
         """Persist models to directory. XGBoost saved as .json, others via joblib."""
         self._assert_trained()
         os.makedirs(directory, exist_ok=True)
+        log.info(f"Saving {len(self.models)} models to {directory}")
+        
         for i, (model, scaler) in enumerate(self.models):
             if isinstance(model, XGBRegressor):
                 model.save_model(os.path.join(directory, f"model_{i}.json"))
             else:
                 joblib.dump(model, os.path.join(directory, f"model_{i}.joblib"))
             joblib.dump(scaler, os.path.join(directory, f"scaler_{i}.joblib"))
+        
+        log.info("Model persistence completed")
 
     def load(self, directory: str) -> None:
         """Restore models saved by save()."""
+        log.info(f"Loading models from {directory}")
         self.models = []
         i = 0
         while True:
@@ -138,23 +151,36 @@ class PredictionService:
             scaler = joblib.load(scaler_path)
             self.models.append((model, scaler))
             i += 1
+        
         self.is_trained = bool(self.models)
+        log.info(f"Loaded {len(self.models)} models, is_trained={self.is_trained}")
 
     def _process_dates(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Convert DRAW DATE to datetime and sort chronologically."""
         df = df.copy()
-        df["DRAW_DATE"] = pd.to_datetime(df["DRAW DATE"])
-        return df.sort_values("DRAW_DATE").reset_index(drop=True)
+        df[ColumnNames.DRAW_DATE_PROCESSED] = pd.to_datetime(df[ColumnNames.DRAW_DATE])
+        return df.sort_values(ColumnNames.DRAW_DATE_PROCESSED).reset_index(drop=True)
 
     def _prepare_training_data(self, df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
+        """Extract features and targets from dataframe.
+        
+        Returns:
+            X: Feature matrix (n_samples - 1, n_features)
+            y: Target matrix (n_samples - 1, numbers_per_draw)
+        """
         feature_cols = [
             c for c in df.columns
             if c.startswith("freq_") or c in ("sum_numbers", "odd_count", "low_count")
         ]
         X = df[feature_cols].values
-        y = df[[f"num_{i}" for i in range(1, self.config.numbers_per_draw + 1)]].values
+        
+        number_cols = [f"num_{i}" for i in range(1, self.config['numbers_per_draw'] + 1)]
+        y = df[number_cols].values
+        
         return X[:-1], y[1:]
 
     def _extract_latest_features(self, df: pd.DataFrame) -> np.ndarray:
+        """Extract feature vector from the last row."""
         feature_cols = [
             c for c in df.columns
             if c.startswith("freq_") or c in ("sum_numbers", "odd_count", "low_count")

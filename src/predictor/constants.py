@@ -8,6 +8,29 @@ class LotteryType(Enum):
     POWERBALL = "powerball"
     EUROMILLIONS = "euromillions"
 
+class RiskLevel(Enum):
+    """Jackpot sharing risk levels."""
+    LOW = "Low"
+    MEDIUM = "Medium"
+    HIGH = "High"
+    
+    @classmethod
+    def from_score(cls, score: float) -> "RiskLevel":
+        """Determine risk level from numeric score.
+        
+        Args:
+            score: Numeric risk score (typically 0-50+).
+        
+        Returns:
+            RiskLevel enum member.
+        """
+        if score < 15:
+            return cls.LOW
+        elif score < 25:
+            return cls.MEDIUM
+        else:
+            return cls.HIGH
+
 class LotteryConstants:
     """Constants for different lottery types."""
     
@@ -34,7 +57,23 @@ class LotteryConstants:
     
     @classmethod
     def get_config(cls, lottery_type: LotteryType) -> Dict[str, Any]:
-        """Get configuration for specific lottery type."""
+        """Get configuration for specific lottery type.
+        
+        Args:
+            lottery_type: A LotteryType enum member.
+        
+        Returns:
+            Dictionary with lottery configuration.
+        
+        Raises:
+            ValueError: If lottery_type is not a valid LotteryType member.
+        """
+        if not isinstance(lottery_type, LotteryType):
+            raise ValueError(f"lottery_type must be a LotteryType enum member, got {type(lottery_type).__name__}: {lottery_type}")
+        
+        if lottery_type not in cls.CONFIGS:
+            raise ValueError(f"Unsupported lottery type: {lottery_type}. Supported: {list(cls.CONFIGS.keys())}")
+        
         return cls.CONFIGS[lottery_type]
     
     @classmethod

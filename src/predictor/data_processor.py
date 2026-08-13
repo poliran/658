@@ -1,4 +1,5 @@
 """Data processing module for lottery prediction."""
+import logging
 from typing import Dict, List, Tuple
 import pandas as pd
 import numpy as np
@@ -6,6 +7,8 @@ from datetime import datetime
 from .constants import LotteryConstants, DEFAULT_LOTTERY, ColumnNames
 from .exceptions import DataProcessingError, ValidationError
 from .validators import DataValidator
+
+log = logging.getLogger(__name__)
 
 class DataProcessor:
     """Handles all data preprocessing operations."""
@@ -18,44 +21,79 @@ class DataProcessor:
         self.data = None  # Store loaded data
         
     def load_data(self, file_path: str) -> pd.DataFrame:
-        """Load and validate lottery data."""
+        """Load and validate lottery data.
+        
+        Only updates self.data after full preprocessing succeeds,
+        preventing partial/corrupt state.
+        
+        Args:
+            file_path: Path to CSV data file.
+        
+        Returns:
+            Preprocessed DataFrame.
+        
+        Raises:
+            DataProcessingError: If loading or validation fails.
+        """
         try:
+            log.info(f"Loading data from {file_path}")
+            
             # Comprehensive file validation (CSV/Excel only for data files)
             validated_path = DataValidator.validate_file_path(file_path, allowed_extensions=['.csv', '.xlsx'])
             
             # Load data with validation
             df = pd.read_csv(validated_path)
+            log.info(f"Loaded {len(df)} rows from {file_path}")
             
             # Validate data structure and content
             required_columns = self.config['data']['validation']['required_columns']
             DataValidator.validate_dataframe(df, required_columns, self.lottery_type)
+            log.info("Data validation passed")
             
-            # Store data for later use
-            self.data = self._preprocess_data(df)
+            # Preprocess data in separate variable
+            # Only update self.data on complete success
+            processed = self._preprocess_data(df)
+            log.info(f"Data preprocessing completed. Final shape: {processed.shape}")
+            
+            # Update state only after full success
+            self.data = processed
             return self.data
+            
         except Exception as e:
+            log.error(f"Data loading failed: {str(e)}", exc_info=True)
             raise DataProcessingError(f"Data loading failed: {str(e)}")
     
-    def _validate_data(self, df: pd.DataFrame) -> None:
-        """Validate input data structure."""
-        required_columns = self.config['data']['validation']['required_columns']
-        DataValidator.validate_dataframe(df, required_columns)
-    
+
     def _preprocess_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Apply all preprocessing steps."""
+        """Apply all preprocessing steps.
+        
+        Args:
+            df: Raw input dataframe.
+        
+        Returns:
+            Fully processed dataframe with features.
+        """
+        log.debug("Starting date processing")
         df = self._process_dates(df)
+        
+        log.debug("Starting number extraction")
         df = self._extract_numbers(df)
+        
+        log.debug("Starting feature creation")
         df = self._create_features(df)
+        
         return df
     
     def _process_dates(self, df: pd.DataFrame) -> pd.DataFrame:
         """Convert date strings to datetime objects."""
+        df = df.copy()  # Avoid modifying input
         df[ColumnNames.DRAW_DATE_PROCESSED] = pd.to_datetime(df[ColumnNames.DRAW_DATE])
         df = df.sort_values(ColumnNames.DRAW_DATE_PROCESSED).reset_index(drop=True)
         return df
     
     def _extract_numbers(self, df: pd.DataFrame) -> pd.DataFrame:
         """Extract individual numbers from combination strings."""
+        df = df.copy()  # Avoid modifying input
         numbers = df[ColumnNames.COMBINATIONS].str.split('-').apply(lambda x: [int(n) for n in x])
         
         number_columns = ColumnNames.get_number_columns(self.lottery_config["numbers_per_draw"])
@@ -66,6 +104,7 @@ class DataProcessor:
     
     def _create_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """Create engineered features for prediction."""
+        df = df.copy()  # Avoid modifying input
         number_range = LotteryConstants.get_number_range(self.lottery_type)
         number_columns = ColumnNames.get_number_columns(self.lottery_config["numbers_per_draw"])
         
@@ -81,7 +120,17 @@ class DataProcessor:
         return df
     
     def prepare_training_data(self, df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
-        """Prepare features and targets for training."""
+        """Prepare features and targets for training.
+        
+        Args:
+            df: Preprocessed dataframe.
+        
+        Returns:
+            Tuple of (X, y) arrays ready for model training.
+        
+        Raises:
+            ValidationError: If data validation fails.
+        """
         if df is None or df.empty:
             raise ValidationError("DataFrame cannot be None or empty")
         
@@ -110,10 +159,17 @@ class DataProcessor:
         return X[:-1], y[1:]  # Use previous draws to predict next
     
     def prepare_next_draw_features(self) -> np.ndarray:
-        """Prepare features for next draw prediction."""
+        """Prepare features for next draw prediction.
+        
+        Returns:
+            Feature vector for the latest draw.
+        
+        Raises:
+            ValidationError: If no training data has been processed.
+        """
         if self.last_features is None:
             raise ValidationError("No training data processed yet")
         
         # Validate features before returning
         DataValidator.validate_features(self.last_features)
-        return self.last_features 
+        return self.last_features

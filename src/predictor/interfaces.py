@@ -43,13 +43,3 @@ class PredictionStrategy(ABC):
     def predict(self, models: List, features: np.ndarray) -> np.ndarray:
         """Generate predictions using the strategy."""
         pass
-
-class LotteryConfig:
-    """Configuration container for lottery-specific settings."""
-    
-    def __init__(self, min_number: int = 1, max_number: int = 58, 
-                 numbers_per_draw: int = 6):
-        self.min_number = min_number
-        self.max_number = max_number
-        self.numbers_per_draw = numbers_per_draw
-        self.number_range = range(min_number, max_number + 1)

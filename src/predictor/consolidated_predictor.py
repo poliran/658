@@ -2,7 +2,7 @@
 import numpy as np
 from typing import Dict, Any, List
 from .system_factory import PredictionSystemFactory
-from .constants import DEFAULT_LOTTERY, FilePaths
+from .constants import DEFAULT_LOTTERY, FilePaths, RiskLevel
 
 
 class ConsolidatedPredictor:
@@ -127,22 +127,25 @@ class ConsolidatedPredictor:
         best = optimized["jackpot_optimized"]
         risk = optimized["risk_analysis"]
         high_conf = analysis["confidence_levels"]["high_confidence"]
-        n = self._service.config.numbers_per_draw
+        n = self._service.config['numbers_per_draw']
 
         recommendation = list(best)
         for num in high_conf:
             if num not in recommendation and len(recommendation) < n:
                 recommendation.append(num)
+        
+        # Get risk level from optimizer analysis or compute from score
+        if "risk_level" in risk:
+            risk_level = risk["risk_level"]
+        else:
+            # Fallback: compute risk level from score
+            risk_level = RiskLevel.from_score(risk.get("overall_risk", 20)).value
 
         return {
             "primary_recommendation": sorted(recommendation[:n]),
             "alternative_recommendations": [sorted(best)],
             "confidence_score": len(high_conf) / n if high_conf else 0.5,
-            "sharing_risk_level": (
-                "Low" if risk["overall_risk"] < 15
-                else "Medium" if risk["overall_risk"] < 25
-                else "High"
-            ),
+            "sharing_risk_level": risk_level,
             "strategy_used": "Confidence + Risk Optimization" if high_conf else "Pure Risk Optimization",
             "key_insights": [
                 f"Most frequent number: {analysis['statistics']['most_frequent'][0]}",

@@ -1,4 +1,5 @@
 """Model training and evaluation module."""
+import logging
 from typing import List, Tuple, Dict
 import numpy as np
 from sklearn.ensemble import VotingRegressor, RandomForestRegressor, GradientBoostingRegressor
@@ -6,6 +7,8 @@ from sklearn.preprocessing import StandardScaler
 from xgboost import XGBRegressor
 from .constants import ModelDefaults
 from .exceptions import ModelTrainingError
+
+log = logging.getLogger(__name__)
 
 class ModelTrainer:
     """Handles model training and evaluation."""
@@ -58,12 +61,23 @@ class ModelTrainer:
     def train(self, X: np.ndarray, y: np.ndarray) -> Tuple[VotingRegressor, StandardScaler]:
         """Train a model with cross-validation and scaling."""
         try:
+            log.info(f"Starting model training with X shape {X.shape}, y shape {y.shape}")
+            
+            # Validate input dimensions
+            assert X.shape[0] == y.shape[0], f"X and y must have same number of samples: {X.shape[0]} != {y.shape[0]}"
+            
+            log.info("Fitting feature scaler...")
             scaler = StandardScaler()
             X_scaled = scaler.fit_transform(X)
             
+            log.info("Creating ensemble model...")
             model = self.create_ensemble()
+            
+            log.info("Fitting ensemble model...")
             model.fit(X_scaled, y)
             
+            log.info(f"Model training completed successfully. Scaler mean shape: {scaler.mean_.shape}")
             return model, scaler
         except Exception as e:
-            raise ModelTrainingError(f"Model training failed: {str(e)}") 
+            log.error(f"Model training failed: {str(e)}", exc_info=True)
+            raise ModelTrainingError(f"Model training failed: {str(e)}")

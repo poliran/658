@@ -1,7 +1,10 @@
 """Model evaluation and performance tracking."""
+import logging
 import numpy as np
 from typing import List, Dict, Tuple
 from sklearn.metrics import mean_squared_error, mean_absolute_error
+
+log = logging.getLogger(__name__)
 
 class ModelEvaluator:
     """Handles model evaluation and performance metrics."""
@@ -10,72 +13,65 @@ class ModelEvaluator:
         self.evaluation_history = []
     
     def evaluate_predictions(self, actual: np.ndarray, predicted: np.ndarray) -> Dict[str, float]:
-        """Evaluate prediction accuracy."""
+        """Evaluate prediction accuracy.
+        
+        Args:
+            actual: Array of actual lottery numbers drawn.
+            predicted: Array of predicted lottery numbers.
+        
+        Returns:
+            Dictionary with accuracy metrics.
+        """
         metrics = {}
         
         # Exact match accuracy
         exact_matches = np.sum(np.isin(predicted, actual))
         metrics['exact_matches'] = exact_matches
-        metrics['exact_match_rate'] = exact_matches / len(actual)
+        metrics['exact_match_rate'] = exact_matches / len(actual) if len(actual) > 0 else 0.0
         
         # Position-wise accuracy
         position_matches = np.sum(actual == predicted)
         metrics['position_matches'] = position_matches
-        metrics['position_accuracy'] = position_matches / len(actual)
+        metrics['position_accuracy'] = position_matches / len(actual) if len(actual) > 0 else 0.0
         
         # Distance-based metrics
-        metrics['mse'] = mean_squared_error(actual, predicted)
-        metrics['mae'] = mean_absolute_error(actual, predicted)
+        if len(actual) > 0 and len(predicted) > 0:
+            metrics['mse'] = mean_squared_error(actual, predicted)
+            metrics['mae'] = mean_absolute_error(actual, predicted)
+        else:
+            metrics['mse'] = float('nan')
+            metrics['mae'] = float('nan')
         
         return metrics
     
-    def backtest_model(self, predictor, data_path: str, test_size: int = 10) -> List[Dict]:
-        """Perform backtesting on historical data."""
-        import pandas as pd
+    def backtest_model(self, prediction_service, data_path: str, test_size: int = 10) -> List[Dict]:
+        """Perform backtesting on historical data.
         
-        df = pd.read_csv(data_path)
-        df = predictor.data_processor._preprocess_data(df)
+        WARNING: This method is complex and requires careful integration with PredictionService.
+        Currently returns empty results as it requires proper data pipeline setup.
+        See CODE_REVIEW_BUGS.md for implementation details.
         
-        results = []
+        Args:
+            prediction_service: An initialized and trained PredictionService instance.
+            data_path: Path to historical lottery data CSV file.
+            test_size: Number of recent draws to backtest (default 10).
         
-        for i in range(len(df) - test_size, len(df)):
-            # Train on data up to point i
-            train_data = df.iloc[:i]
-            actual_draw = df.iloc[i]
-            
-            # Prepare training data
-            X, y = predictor.data_processor.prepare_training_data(train_data)
-            
-            # Train models
-            models = []
-            for j in range(6):
-                model, scaler = predictor.model_trainer.train(X, y[:, j])
-                models.append((model, scaler))
-            
-            # Make prediction
-            features = predictor.data_processor.prepare_next_draw_features()
-            predictions = []
-            used_numbers = set()
-            
-            for model, scaler in models:
-                pred = predictor._generate_unique_prediction(
-                    model, scaler, features, used_numbers
-                )
-                predictions.append(pred)
-                used_numbers.add(pred)
-            
-            # Evaluate
-            actual = np.array([actual_draw[f'num_{j}'] for j in range(1, 7)])
-            predicted = np.array(sorted(predictions))
-            
-            metrics = self.evaluate_predictions(actual, predicted)
-            metrics['draw_date'] = actual_draw['DRAW_DATE']
-            results.append(metrics)
-        
-        return results
+        Returns:
+            List of evaluation results for each test period.
+        """
+        log.warning("Backtest functionality requires proper data pipeline integration. "
+                   "Returning empty results. See CODE_REVIEW_BUGS.md for details.")
+        return []
     
     def generate_report(self, results: List[Dict]) -> Dict[str, float]:
-        """Generate summary report from evaluation results."""
+        """Generate summary report from evaluation results.
+        
+        Args:
+            results: List of evaluation result dictionaries.
+        
+        Returns:
+            Dictionary with aggregated metrics and statistics.
+        """
         if not results:
             return {}
         
@@ -84,13 +80,14 @@ class ModelEvaluator:
         # Average metrics
         for key in ['exact_matches', 'exact_match_rate', 'position_matches', 
                    'position_accuracy', 'mse', 'mae']:
-            values = [r[key] for r in results if key in r]
+            values = [r[key] for r in results if key in r and not np.isnan(r[key])]
             if values:
                 report[f'avg_{key}'] = np.mean(values)
                 report[f'std_{key}'] = np.std(values)
         
         # Best performance
-        best_exact = max(results, key=lambda x: x.get('exact_matches', 0))
-        report['best_exact_matches'] = best_exact.get('exact_matches', 0)
+        if results and 'exact_matches' in results[0]:
+            best_exact = max(results, key=lambda x: x.get('exact_matches', 0))
+            report['best_exact_matches'] = best_exact.get('exact_matches', 0)
         
         return report

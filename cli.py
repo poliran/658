@@ -30,17 +30,17 @@ def _build_orchestrator(config: str, data: str) -> PredictionOrchestrator:
 def cmd_predict(args):
     orch = _build_orchestrator(args.config, args.data)
     result = orch.get_predictions()
-    log.info(f"Standard prediction:  {sorted(result['standard'])}")
-    log.info(f"Optimized prediction: {sorted(result['optimized'])}")
+    log.info(f"Standard prediction:  {sorted(int(n) for n in result['standard'])}")
+    log.info(f"Optimized prediction: {sorted(int(n) for n in result['optimized'])}")
 
 
 def cmd_optimize(args):
     orch = _build_orchestrator(args.config, args.data)
     result = orch.get_predictions()
-    log.info(f"Jackpot-optimized: {sorted(result['optimized'])}")
-    log.info(f"Anti-popular sets:")
+    log.info(f"Jackpot-optimized: {sorted(int(n) for n in result['optimized'])}")
+    log.info("Anti-popular sets:")
     for i, pred in enumerate(result["anti_popular"], 1):
-        log.info(f"  Set {i}: {sorted(pred)}")
+        log.info(f"  Set {i}: {sorted(int(n) for n in pred)}")
 
 
 def cmd_report(args):

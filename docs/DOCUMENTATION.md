@@ -505,3 +505,191 @@ class MyDataLoader(DataLoader):
 ## Disclaimer
 
 For educational and research purposes only. Lottery draws are random by design — no statistical model or machine learning system can predict random outcomes or guarantee winning numbers.
+
+---
+
+## Examples
+
+### Example 1: Get a quick prediction
+
+The simplest possible usage — train and predict in four lines.
+
+```python
+from src.predictor import PredictionSystemFactory
+
+service = PredictionSystemFactory.create_lottery_predictor('config/model_config.yaml')
+service.train('data/lottery_history.csv', model_config={})
+features = service.prepare_features('data/lottery_history.csv')
+
+print("Next draw prediction:", sorted(service.predict(features)))
+# → Next draw prediction: [4, 17, 29, 33, 41, 52]
+```
+
+---
+
+### Example 2: Jackpot-sharing optimized prediction
+
+Use the game-theoretic optimizer to pick numbers less likely to be chosen by other players.
+
+```python
+from src.predictor import PredictionSystemFactory
+
+service = PredictionSystemFactory.create_lottery_predictor('config/model_config.yaml')
+service.train('data/lottery_history.csv', model_config={})
+features = service.prepare_features('data/lottery_history.csv')
+
+standard   = sorted(service.predict(features))
+optimized  = sorted(service.predict_optimized(features))
+
+print("Standard:  ", standard)
+print("Optimized: ", optimized)
+# Optimized avoids birthday numbers (1-31) and common lucky numbers
+```
+
+---
+
+### Example 3: Generate multiple anti-popular sets
+
+Generate several prediction sets that all minimize jackpot sharing risk.
+
+```python
+from src.predictor import PredictionSystemFactory
+
+service = PredictionSystemFactory.create_lottery_predictor('config/model_config.yaml')
+service.train('data/lottery_history.csv', model_config={})
+features = service.prepare_features('data/lottery_history.csv')
+
+sets = service.predict_anti_popular(features, count=5)
+for i, pred in enumerate(sets, 1):
+    print(f"Anti-popular set {i}: {sorted(pred)}")
+```
+
+---
+
+### Example 4: Full summary report
+
+Use the three-layer reporting stack to get a formatted report with confidence scores and risk analysis.
+
+```python
+from src.predictor import PredictionSystemFactory, PredictionOrchestrator, PredictionAnalyzer, ReportFormatter
+
+service = PredictionSystemFactory.create_lottery_predictor('config/model_config.yaml')
+
+orch = PredictionOrchestrator(service)
+orch.train('data/lottery_history.csv')
+
+report = ReportFormatter(orch, PredictionAnalyzer()).summary()
+print(report)
+```
+
+Output includes:
+- Primary recommendation with strategy and confidence score
+- Sharing risk level (Low / Medium / High)
+- High-confidence numbers (appeared in ≥40% of prediction sets)
+- Key insights (most frequent number, average, birthday count)
+
+---
+
+### Example 5: Save and reload a trained model
+
+Train once, save, and reload later without retraining.
+
+```python
+from src.predictor import PredictionSystemFactory
+
+service = PredictionSystemFactory.create_lottery_predictor('config/model_config.yaml')
+service.train('data/lottery_history.csv', model_config={})
+service.save('models/latest')
+
+# --- later, in a new session ---
+
+service2 = PredictionSystemFactory.create_lottery_predictor('config/model_config.yaml')
+service2.load('models/latest')
+
+features = service2.prepare_features('data/lottery_history.csv')
+print("Loaded model prediction:", sorted(service2.predict(features)))
+```
+
+---
+
+### Example 6: High-level interface with all predictions at once
+
+`ConsolidatedPredictor` wraps everything into a single object.
+
+```python
+from src.predictor import ConsolidatedPredictor
+
+predictor = ConsolidatedPredictor('config/model_config.yaml')
+predictor.train('data/lottery_history.csv')
+
+# All prediction types in one call
+results = predictor.get_all_predictions()
+
+print("Primary recommendation:", results['recommendations']['primary_recommendation'])
+print("Confidence score:      ", f"{results['recommendations']['confidence_score']:.0%}")
+print("Sharing risk:          ", results['recommendations']['sharing_risk_level'])
+print("High-confidence nums:  ", sorted(results['analysis']['confidence_levels']['high_confidence']))
+
+# Quick single prediction
+print("Quick pick:            ", sorted(predictor.get_quick_prediction()))
+
+# Human-readable report
+print(predictor.get_summary_report())
+```
+
+---
+
+### Example 7: Analyze sharing risk for a custom set
+
+Score any set of numbers for jackpot sharing risk without running the full prediction pipeline.
+
+```python
+from src.predictor.jackpot_optimizer import JackpotSharingOptimizer
+from src.predictor.constants import DEFAULT_LOTTERY
+import numpy as np
+
+optimizer = JackpotSharingOptimizer(DEFAULT_LOTTERY)
+
+# High-risk set: all birthday numbers, consecutive
+risky = np.array([7, 11, 13, 21, 23, 28])
+# Low-risk set: high numbers, no common patterns
+safe  = np.array([36, 42, 47, 51, 54, 57])
+
+print("Risky set risk score:", optimizer.analyze_sharing_risk(risky)['overall_risk'])
+print("Safe  set risk score:", optimizer.analyze_sharing_risk(safe)['overall_risk'])
+# Risky score will be significantly higher
+```
+
+---
+
+### Example 8: Support a different lottery type
+
+Switch to Powerball by passing a different `LotteryType` to the factory.
+
+```python
+from src.predictor import PredictionSystemFactory
+from src.predictor.constants import LotteryType
+
+service = PredictionSystemFactory.create_lottery_predictor(
+    'config/model_config.yaml',
+    lottery_type=LotteryType.POWERBALL   # 1-69, 5 numbers
+)
+service.train('data/powerball_history.csv', model_config={})
+features = service.prepare_features('data/powerball_history.csv')
+print("Powerball prediction:", sorted(service.predict(features)))
+```
+
+---
+
+### Example 9: CLI one-liners
+
+```bash
+# Predict with a custom data file
+python cli.py predict --data data/lottery_history_2026.csv
+
+# Generate a report and save to file
+python cli.py report > outputs/report_$(date +%Y%m%d).txt
+
+# Run in Docker
+docker run --rm -v $(pwd)/data:/app/data lottery-predictor:latest python cli.py optimize
+```

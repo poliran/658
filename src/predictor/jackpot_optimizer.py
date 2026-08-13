@@ -1,10 +1,13 @@
 """Game-theoretic jackpot sharing optimization for lottery predictions."""
+import logging
 import numpy as np
 import pandas as pd
-from typing import List, Dict, Tuple, Set
+from typing import List, Dict, Tuple, Set, Optional
 from collections import Counter
 from itertools import combinations
-from .constants import LotteryConstants, DEFAULT_LOTTERY
+from .constants import LotteryConstants, DEFAULT_LOTTERY, RiskLevel
+
+log = logging.getLogger(__name__)
 
 class JackpotSharingOptimizer:
     """Optimizes lottery number selection to minimize jackpot sharing using game theory."""
@@ -13,6 +16,9 @@ class JackpotSharingOptimizer:
         self.lottery_type = lottery_type
         self.lottery_config = LotteryConstants.get_config(lottery_type)
         self.number_range = LotteryConstants.get_number_range(lottery_type)
+        
+        # Cache for popularity scores (computed once, reused across calls)
+        self._popularity_scores_cache: Optional[Dict[int, float]] = None
         
         # Common human biases in number selection
         self.bias_patterns = {
@@ -23,12 +29,35 @@ class JackpotSharingOptimizer:
             'multiples': self._generate_multiples(),  # Multiples of 5, 10
         }
     
+    def _get_popularity_scores(self, historical_data: pd.DataFrame = None) -> Dict[int, float]:
+        """Get cached popularity scores or calculate if not cached.
+        
+        Args:
+            historical_data: Optional historical data. If provided, recalculates scores.
+                            If None, returns cached scores or calculates if empty.
+        
+        Returns:
+            Dictionary mapping numbers to popularity scores.
+        """
+        # Recalculate if historical data provided, otherwise use cache
+        if historical_data is not None or self._popularity_scores_cache is None:
+            self._popularity_scores_cache = self._calculate_popularity_scores(historical_data)
+        return self._popularity_scores_cache
+    
+    def clear_cache(self) -> None:
+        """Clear the popularity scores cache.
+        
+        Call this if popularity calculation parameters change or historical data updates.
+        """
+        self._popularity_scores_cache = None
+        log.debug("Popularity scores cache cleared")
+    
     def optimize_selection(self, base_predictions: List[np.ndarray], 
                           historical_data: pd.DataFrame = None) -> np.ndarray:
         """Optimize number selection to minimize expected jackpot sharing."""
         
-        # Calculate popularity scores for all numbers
-        popularity_scores = self._calculate_popularity_scores(historical_data)
+        # Get cached popularity scores
+        popularity_scores = self._get_popularity_scores(historical_data)
         
         # Evaluate each prediction set
         best_prediction = None
@@ -47,7 +76,17 @@ class JackpotSharingOptimizer:
         return optimized
     
     def _calculate_popularity_scores(self, historical_data: pd.DataFrame = None) -> Dict[int, float]:
-        """Calculate popularity scores for each number based on human biases."""
+        """Calculate popularity scores for each number based on human biases.
+        
+        Bias Multipliers:
+            - Birthdays (1-31): 3.5× (very strong human preference)
+            - Lucky numbers (7, 11, 13, 21, 23): 2.8× (cultural/superstition bias)
+            - Visual patterns on tickets: 2.2× (pattern recognition bias)
+            - Multiples of 5/10: 1.8× (preference for round numbers)
+            - Sequence anchors: 1.5× (tendency to pick runs)
+            - Edge numbers (≤5, ≥55): 0.7× (numbers avoided)
+            - Middle range (20-40): 1.3× (clustering preference)
+        """
         scores = {}
         
         for num in self.number_range:
@@ -208,12 +247,14 @@ class JackpotSharingOptimizer:
         
         return True
     
-    def analyze_sharing_risk(self, prediction: np.ndarray) -> Dict[str, float]:
+    def analyze_sharing_risk(self, prediction: np.ndarray) -> Dict[str, any]:
         """Analyze and report sharing risk factors for a prediction."""
-        popularity_scores = self._calculate_popularity_scores()
+        popularity_scores = self._get_popularity_scores()
+        risk_score = self._calculate_sharing_risk(prediction, popularity_scores)
         
         analysis = {
-            'overall_risk': self._calculate_sharing_risk(prediction, popularity_scores),
+            'overall_risk': risk_score,
+            'risk_level': RiskLevel.from_score(risk_score).value,
             'individual_popularity': sum(popularity_scores[num] for num in prediction) / len(prediction),
             'birthday_numbers': sum(1 for n in prediction if n <= 31),
             'lucky_numbers': sum(1 for n in prediction if n in self.bias_patterns['lucky_numbers']),
@@ -225,9 +266,21 @@ class JackpotSharingOptimizer:
         
         return analysis
     
-    def generate_anti_popular_prediction(self, count: int = 1) -> List[np.ndarray]:
-        """Generate predictions specifically designed to minimize sharing."""
-        popularity_scores = self._calculate_popularity_scores()
+    def generate_anti_popular_prediction(self, count: int = 1, seed: Optional[int] = None) -> List[np.ndarray]:
+        """Generate predictions specifically designed to minimize sharing.
+        
+        Args:
+            count: Number of anti-popular prediction sets to generate.
+            seed: Optional random seed for reproducibility. Uses np.random.default_rng() 
+                  for local seed management, not global state pollution.
+        
+        Returns:
+            List of numpy arrays, each containing predicted lottery numbers.
+        """
+        # Use local RNG instead of global np.random.seed() to avoid side effects
+        rng = np.random.default_rng(seed)
+        
+        popularity_scores = self._get_popularity_scores()
         
         # Sort numbers by popularity (ascending - least popular first)
         sorted_numbers = sorted(self.number_range, key=lambda x: popularity_scores[x])
@@ -237,7 +290,7 @@ class JackpotSharingOptimizer:
         for i in range(count):
             # Start with least popular numbers
             base_selection = sorted_numbers[:self.lottery_config["numbers_per_draw"] + 5]
-            selected = np.random.choice(
+            selected = rng.choice(
                 base_selection, 
                 self.lottery_config["numbers_per_draw"], 
                 replace=False
@@ -246,7 +299,7 @@ class JackpotSharingOptimizer:
             # Ensure no obvious patterns
             while (self._count_consecutive_numbers(selected) > 1 or 
                    self._is_arithmetic_sequence(selected)):
-                selected = np.random.choice(
+                selected = rng.choice(
                     base_selection, 
                     self.lottery_config["numbers_per_draw"], 
                     replace=False
@@ -269,7 +322,7 @@ class JackpotSharingOptimizer:
                 'avg_popularity': analysis['individual_popularity'],
                 'birthday_count': analysis['birthday_numbers'],
                 'consecutive_pairs': analysis['consecutive_pairs'],
-                'risk_level': 'Low' if analysis['overall_risk'] < 15 else 'Medium' if analysis['overall_risk'] < 25 else 'High'
+                'risk_level': analysis['risk_level']
             })
         
         return pd.DataFrame(results).sort_values('sharing_risk')
