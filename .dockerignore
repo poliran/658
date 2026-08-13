@@ -9,6 +9,17 @@
 .gitattributes
 
 # ============================================================================
+# Package Files
+# ============================================================================
+# setup.py: Excluded from production image to avoid pip install -e . issues
+#           (setup.py expects README.md, but README.md is also excluded)
+#           If package installation needed, include both or modify Dockerfile
+setup.py
+README.md
+CONTRIBUTING.md
+LICENSE
+
+# ============================================================================
 # Python Cache and Virtual Environments
 # ============================================================================
 __pycache__
@@ -46,12 +57,14 @@ shell_benchmark.sh
 shell_performance.md
 *.md
 docs/
-README.md
-CONTRIBUTING.md
-LICENSE
 CHANGELOG.md
 CODE_REVIEW_BUGS.md
 FIXES_APPLIED.md
+DOCKER_SETUP.md
+DOCKER_QUICK_REFERENCE.md
+CONTAINERIZATION_COMPLETE.md
+PROJECT_COMPLETION_SUMMARY.md
+README_DELIVERY.md
 
 # ============================================================================
 # Logs and Temporary Files
