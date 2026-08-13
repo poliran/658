@@ -1,23 +1,30 @@
+version: '3.9'
+
 services:
+  # ========================================================================
+  # Production Service: Lottery Predictor
+  # ========================================================================
   lottery-predictor:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: lottery-predictor
+      args:
+        PIP_NO_CACHE_DIR: "1"
+    
+    container_name: lottery-predictor-prod
     image: lottery-predictor:latest
-
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Environment variables
     environment:
       PYTHONUNBUFFERED: "1"
       PYTHONDONTWRITEBYTECODE: "1"
-
-    volumes:
-      - ./src:/app/src
-      - ./config:/app/config
-      - ./data:/app/data
-      - ./models:/app/models
-      - ./cli.py:/app/cli.py
-      - ./outputs:/app/outputs
-
+      PYTHONHASHSEED: "random"
+      LOG_LEVEL: "INFO"
+    
+    # Resource limits (prevent runaway processes)
     deploy:
       resources:
         limits:
@@ -26,53 +33,99 @@ services:
         reservations:
           cpus: '1'
           memory: 1G
-
+    
+    # Volume mounts for persistence
+    volumes:
+      # Read-only config
+      - ./config:/app/config:ro
+      # Read-only input data
+      - ./data:/app/data:ro
+      # Writable output directories
+      - ./models:/app/models
+      - ./outputs:/app/outputs
+      - ./logs:/app/logs
+    
+    # Logging configuration
     logging:
       driver: "json-file"
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: "50m"
+        max-file: "5"
+        labels: "app=lottery-predictor"
+    
+    # Security options
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    
+    security_opt:
+      - no-new-privileges:true
+    
+    # Default command (can be overridden)
+    command: ["python", "cli.py", "predict"]
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; from src.predictor.constants import RiskLevel; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # Labels for container management
+    labels:
+      app: "lottery-predictor"
+      version: "1.0.0"
+      environment: "production"
 
-    restart: no
-
-  lottery-predictor-dev:
+  # ========================================================================
+  # Optional: One-time runner for full reports
+  # Usage: docker compose run --rm report-runner python cli.py report
+  # ========================================================================
+  report-runner:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: lottery-predictor-dev
+    
     image: lottery-predictor:latest
-
+    
     environment:
       PYTHONUNBUFFERED: "1"
-      PYTHONDONTWRITEBYTECODE: "1"
-
+      LOG_LEVEL: "INFO"
+    
     volumes:
-      - ./src:/app/src
-      - ./config:/app/config
-      - ./data:/app/data
-      - ./models:/app/models
-      - ./cli.py:/app/cli.py
-      - ./tests:/app/tests
+      - ./config:/app/config:ro
+      - ./data:/app/data:ro
       - ./outputs:/app/outputs
-      - ./requirements-dev.txt:/app/requirements-dev.txt
-
-    command: >
-      bash -c "pip install -r requirements-dev.txt &&
-               python -m pytest tests/ -v --cov=src --cov-report=html"
-
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          cpus: '1'
-          memory: 1G
-
+    
     logging:
       driver: "json-file"
       options:
-        max-size: "10m"
+        max-size: "50m"
         max-file: "3"
+    
+    cap_drop:
+      - ALL
+    
+    security_opt:
+      - no-new-privileges:true
+    
+    # Override default to run reports
+    command: ["python", "cli.py", "report"]
 
-    restart: no
+volumes:
+  # Named volumes for persistence (optional, uses driver default)
+  models-volume:
+    driver: local
+  outputs-volume:
+    driver: local
+  logs-volume:
+    driver: local
+
+networks:
+  default:
+    name: lottery-net
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-lottery

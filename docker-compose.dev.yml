@@ -1,0 +1,165 @@
+version: '3.9'
+
+services:
+  # ========================================================================
+  # Development Service: Lottery Predictor with hot reload and debugging
+  # Usage: docker compose -f docker-compose.dev.yml up
+  # ========================================================================
+  lottery-predictor-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PIP_NO_CACHE_DIR: "1"
+    
+    container_name: lottery-predictor-dev
+    image: lottery-predictor:dev
+    
+    # No auto-restart for dev
+    restart: "no"
+    
+    # Environment variables for development
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONHASHSEED: "random"
+      LOG_LEVEL: "DEBUG"
+      ENV: "development"
+    
+    # More lenient resource limits for dev
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 2G
+    
+    # Volume mounts with bind mounts for hot reload
+    volumes:
+      # Source code (hot reload)
+      - ./src:/app/src
+      - ./cli.py:/app/cli.py
+      
+      # Config (read-only)
+      - ./config:/app/config:ro
+      
+      # Data (read-only)
+      - ./data:/app/data:ro
+      
+      # Writable outputs
+      - ./models:/app/models
+      - ./outputs:/app/outputs
+      - ./logs:/app/logs
+      
+      # Tests
+      - ./tests:/app/tests
+      - ./pytest.ini:/app/pytest.ini:ro
+      
+      # Development tools
+      - ./requirements-dev.txt:/app/requirements-dev.txt:ro
+    
+    # Logging for development
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+    
+    # Allow privileged mode for better debugging (optional)
+    # privileged: true
+    
+    # Security (still enforced in dev)
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    
+    security_opt:
+      - no-new-privileges:true
+    
+    # Development command: install dev deps and run tests with coverage
+    command: >
+      bash -c "
+        pip install -q -r requirements-dev.txt &&
+        echo '============================================' &&
+        echo 'Running tests with coverage...' &&
+        echo '============================================' &&
+        python -m pytest tests/ -v --cov=src --cov-report=term-missing --cov-report=html &&
+        echo '' &&
+        echo '============================================' &&
+        echo 'Code quality checks...' &&
+        echo '============================================' &&
+        echo 'Black formatting check:' &&
+        black --check src/ 2>/dev/null || echo '  (Run: black src/ to fix)' &&
+        echo 'Flake8 linting:' &&
+        flake8 src/ --max-line-length=120 || true &&
+        echo '' &&
+        echo '============================================' &&
+        echo 'Dev environment ready. Container running.' &&
+        echo 'Run predictions: docker compose -f docker-compose.dev.yml exec lottery-predictor-dev python cli.py predict' &&
+        echo 'Run optimize: docker compose -f docker-compose.dev.yml exec lottery-predictor-dev python cli.py optimize' &&
+        echo 'Run report: docker compose -f docker-compose.dev.yml exec lottery-predictor-dev python cli.py report' &&
+        echo '============================================' &&
+        tail -f /dev/null
+      "
+    
+    # Interactive terminal for development
+    stdin_open: true
+    tty: true
+    
+    # Labels
+    labels:
+      app: "lottery-predictor"
+      environment: "development"
+
+  # ========================================================================
+  # Testing service: Runs full test suite
+  # Usage: docker compose -f docker-compose.dev.yml run --rm test-runner
+  # ========================================================================
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PIP_NO_CACHE_DIR: "1"
+    
+    image: lottery-predictor:test
+    
+    environment:
+      PYTHONUNBUFFERED: "1"
+      LOG_LEVEL: "DEBUG"
+    
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - ./pytest.ini:/app/pytest.ini:ro
+      - ./requirements-dev.txt:/app/requirements-dev.txt:ro
+      - ./htmlcov:/app/htmlcov
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+    
+    cap_drop:
+      - ALL
+    
+    security_opt:
+      - no-new-privileges:true
+    
+    command: >
+      bash -c "
+        pip install -q -r requirements-dev.txt &&
+        python -m pytest tests/ -v --cov=src --cov-report=html:htmlcov --cov-report=term-missing
+      "
+
+networks:
+  default:
+    name: lottery-net-dev
+    driver: bridge
+
+volumes:
+  htmlcov:
+    driver: local

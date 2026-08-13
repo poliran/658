@@ -1,38 +1,110 @@
+# Docker Build Context Exclusions
+# Files/directories excluded from docker build context to reduce build time
+
+# ============================================================================
+# Version Control
+# ============================================================================
 .git
 .gitignore
+.gitattributes
+
+# ============================================================================
+# Python Cache and Virtual Environments
+# ============================================================================
+__pycache__
 .pytest_cache
 .mypy_cache
-__pycache__
-*.pyc
-*.pyo
-*.egg-info
-.eggs
-dist
-build
-.env
-.env.local
-.DS_Store
-*.log
-logs/
 .coverage
 htmlcov/
+.eggs
+*.egg-info
+dist/
+build/
 .venv
 venv/
 env/
+ENV/
+*.egg
+
+# ============================================================================
+# IDE and Editor Configuration
+# ============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.editorconfig
+.env.local
+
+# ============================================================================
+# Development and Testing
+# ============================================================================
+Makefile
+shell_benchmark.sh
+shell_performance.md
 *.md
 docs/
+README.md
+CONTRIBUTING.md
+LICENSE
+CHANGELOG.md
+CODE_REVIEW_BUGS.md
+FIXES_APPLIED.md
+
+# ============================================================================
+# Logs and Temporary Files
+# ============================================================================
+*.log
+logs/
+*.tmp
+*.temp
+.tmux*
+
+# ============================================================================
+# Archive and Legacy
+# ============================================================================
 archive/
 examples/
 benchmarks/
-*.md
-ACTION_PLAN.md
-CONSTANTS_UPDATE_COMPLETE.md
-DEPRECATED.md
-LEGACY_CLEANUP_COMPLETE.md
-SHELL_OPTIMIZATION.md
-VALIDATION_COMPLETE.md
-shell_benchmark.sh
-shell_performance.md
-Makefile
-.editorconfig
-.gitattributes
+legacy/
+deprecated/
+
+# ============================================================================
+# Docker-specific (avoid redundancy)
+# ============================================================================
+Dockerfile.old
+docker-compose.*.old
+.dockerignore
+
+# ============================================================================
+# OS-specific Files
+# ============================================================================
+.DS_Store
+Thumbs.db
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# ============================================================================
+# Data Files (large, handled separately)
+# ============================================================================
+# Uncomment if data is very large and handled via volumes
+# data/raw/
+# outputs/
+
+# ============================================================================
+# Node modules and other language runtimes (if applicable)
+# ============================================================================
+node_modules/
+.npm/
+
+# ============================================================================
+# CI/CD
+# ============================================================================
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+.jenkins/
