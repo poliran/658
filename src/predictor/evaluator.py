@@ -15,8 +15,11 @@ class ModelEvaluator:
         self.config_path = config_path
         self.evaluation_history = []
 
-    def evaluate(self, data_path: str = None) -> Dict[str, float]:
-        """Evaluate model performance on historical draw data."""
+    def evaluate(self, data_path: str = None, random_baseline: bool = False) -> Dict[str, float]:
+        """Evaluate model performance on historical draw data.
+
+        If random_baseline is True, also run statistical randomness tests and report results.
+        """
         from .system_factory import PredictionSystemFactory
         from .constants import FilePaths
 
@@ -52,6 +55,24 @@ class ModelEvaluator:
         log.info(f"Model Evaluation Summary (over {len(metrics_list)} recent draws):")
         for k, v in summary.items():
             log.info(f"  {k}: {v:.4f}")
+
+        # Optional randomness baseline tests
+        if random_baseline:
+            try:
+                from .eval.randomness import analyze_draws
+
+                # use the last 200 draws or all if smaller
+                recent = actuals[-200:]
+                randomness_report = analyze_draws(recent, num_bins=service.config.get("number_max", 58))
+                log.info("Randomness baseline tests:")
+                log.info(f"  chi2.stat: {randomness_report['chi2']['chi2']:.4f}, dof: {randomness_report['chi2']['dof']}, p: {randomness_report['chi2']['p_value']}")
+                log.info(f"  runs.z: {randomness_report['runs']['z']:.4f}, p: {randomness_report['runs']['p_value']}")
+                log.info(f"  serial_corr.lag1: {randomness_report['serial_corr_lag1']['autocorr']:.6f}")
+                log.info(f"  compression.ratio: {randomness_report['compression']['ratio']:.6f}")
+                summary["randomness"] = randomness_report
+            except Exception:
+                log.exception("Failed to run randomness baseline tests")
+
         return summary
 
     def evaluate_predictions(self, actual: np.ndarray, predicted: np.ndarray) -> Dict[str, float]:
