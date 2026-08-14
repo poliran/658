@@ -52,7 +52,7 @@ def cmd_report(args):
 
 def cmd_evaluate(args):
     evaluator = ModelEvaluator(args.config)
-    evaluator.evaluate(args.data)
+    evaluator.evaluate(args.data, random_baseline=getattr(args, 'random_baseline', False))
 
 
 def main():
@@ -64,7 +64,8 @@ def main():
     sub.add_parser("predict", help="Generate standard and optimized predictions")
     sub.add_parser("optimize", help="Jackpot-sharing optimized predictions")
     sub.add_parser("report", help="Full summary report")
-    sub.add_parser("evaluate", help="Evaluate model performance")
+    eval_parser = sub.add_parser("evaluate", help="Evaluate model performance")
+    eval_parser.add_argument("--random-baseline", action="store_true", help="Run randomness baseline statistical tests in addition to model evaluation")
 
     args = parser.parse_args()
     {"predict": cmd_predict, "optimize": cmd_optimize, "report": cmd_report, "evaluate": cmd_evaluate}[
