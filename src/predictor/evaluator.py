@@ -29,9 +29,14 @@ class ModelEvaluator:
         service = PredictionSystemFactory.create_lottery_predictor(config)
         service.train(data, model_config={})
 
-        raw = service.data_loader.load(data)
-        processed = service._process_dates(raw)
-        featured = service.feature_engineer.create_features(processed)
+        # Use public service API to obtain the training DataFrame (features + targets)
+        try:
+            featured = service.get_training_data()
+        except Exception:
+            # Fall back to computing features if training data is not exposed
+            raw = service.data_loader.load(data)
+            processed = service._process_dates(raw)
+            featured = service.feature_engineer.create_features(processed)
 
         number_cols = [f"num_{i}" for i in range(1, service.config["numbers_per_draw"] + 1)]
         actuals = featured[number_cols].values

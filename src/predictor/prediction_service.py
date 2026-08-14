@@ -157,6 +157,16 @@ class PredictionService:
         self.is_trained = bool(self.models)
         log.info(f"Loaded {len(self.models)} models, is_trained={self.is_trained}")
 
+    def get_training_data(self) -> pd.DataFrame:
+        """Return the last computed training DataFrame (features + targets).
+
+        Raises:
+            ValueError: If the service has not been trained or training data not available.
+        """
+        if self._training_data is None:
+            raise ValueError("No training data available; train the service first.")
+        return self._training_data.copy()
+
     def _process_dates(self, df: pd.DataFrame) -> pd.DataFrame:
         """Convert DRAW DATE to datetime and sort chronologically."""
         df = df.copy()
