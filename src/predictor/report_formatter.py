@@ -1,5 +1,5 @@
 """ReportFormatter — formats orchestrator + analyzer output into human-readable reports."""
-from typing import Dict, Any
+
 from .prediction_orchestrator import PredictionOrchestrator
 from .prediction_analyzer import PredictionAnalyzer
 
@@ -28,9 +28,9 @@ class ReportFormatter:
         recommendation = sorted(recommendation[:n])
 
         risk_label = (
-            "Low" if risk["overall_risk"] < 15
-            else "Medium" if risk["overall_risk"] < 25
-            else "High"
+            "Low"
+            if risk["overall_risk"] < 15
+            else "Medium" if risk["overall_risk"] < 25 else "High"
         )
         strategy = "Confidence + Risk Optimization" if high_conf else "Pure Risk Optimization"
         confidence_score = len(high_conf) / n if high_conf else 0.5

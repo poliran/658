@@ -1,4 +1,5 @@
 """PredictionAnalyzer — pure analysis functions over prediction sets."""
+
 import numpy as np
 from typing import Dict, List, Any
 

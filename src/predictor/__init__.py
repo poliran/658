@@ -1,4 +1,5 @@
 """Lottery predictor module."""
+
 from .prediction_service import PredictionService
 from .prediction_orchestrator import PredictionOrchestrator
 from .prediction_analyzer import PredictionAnalyzer

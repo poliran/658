@@ -1,4 +1,5 @@
 """Consolidated prediction system — now backed by PredictionService via factory."""
+
 import numpy as np
 from typing import Dict, Any, List
 from .system_factory import PredictionSystemFactory
@@ -97,9 +98,7 @@ class ConsolidatedPredictor:
         }
 
     def _get_prediction_analysis(self, basic, advanced) -> Dict[str, Any]:
-        all_preds = list(basic.values()) + [
-            p for lst in advanced.values() for p in lst
-        ]
+        all_preds = list(basic.values()) + [p for lst in advanced.values() for p in lst]
         freq: Dict[int, int] = {}
         for pred in all_preds:
             for n in pred:
@@ -127,13 +126,13 @@ class ConsolidatedPredictor:
         best = optimized["jackpot_optimized"]
         risk = optimized["risk_analysis"]
         high_conf = analysis["confidence_levels"]["high_confidence"]
-        n = self._service.config['numbers_per_draw']
+        n = self._service.config["numbers_per_draw"]
 
         recommendation = list(best)
         for num in high_conf:
             if num not in recommendation and len(recommendation) < n:
                 recommendation.append(num)
-        
+
         # Get risk level from optimizer analysis or compute from score
         if "risk_level" in risk:
             risk_level = risk["risk_level"]
@@ -146,7 +145,9 @@ class ConsolidatedPredictor:
             "alternative_recommendations": [sorted(best)],
             "confidence_score": len(high_conf) / n if high_conf else 0.5,
             "sharing_risk_level": risk_level,
-            "strategy_used": "Confidence + Risk Optimization" if high_conf else "Pure Risk Optimization",
+            "strategy_used": (
+                "Confidence + Risk Optimization" if high_conf else "Pure Risk Optimization"
+            ),
             "key_insights": [
                 f"Most frequent number: {analysis['statistics']['most_frequent'][0]}",
                 f"Average number: {analysis['statistics']['average_number']:.1f}",
