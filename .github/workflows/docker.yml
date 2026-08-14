@@ -1,0 +1,145 @@
+name: Docker Build & Push
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      registry:
+        description: 'Docker registry (docker.io, ghcr.io, etc.)'
+        required: false
+        default: 'docker.io'
+
+env:
+  REGISTRY: ${{ github.event.inputs.registry || 'docker.io' }}
+  IMAGE_NAME: lottery-predictor
+  BUILDKIT_VERSION: latest
+
+jobs:
+  build:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: ${{ env.BUILDKIT_VERSION }}
+          buildkitd-flags: --allow-insecure-entitlement security.insecure
+
+      - name: Log in to Docker Hub (if applicable)
+        if: github.event_name != 'pull_request' && env.REGISTRY == 'docker.io'
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request' && env.REGISTRY == 'ghcr.io'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+
+      - name: Test built image
+        if: github.event_name == 'pull_request'
+        run: |
+          docker build -t test-image:latest .
+          docker run --rm test-image:latest python cli.py --help
+          docker run --rm test-image:latest python -c "from src.predictor.constants import RiskLevel; print('✅ Image imports verified')"
+
+  scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name != 'pull_request'
+    
+    steps:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ needs.build.outputs.image-tag }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  verify:
+    name: Verify Image
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Test image with docker-compose
+        run: |
+          docker-compose build
+          docker-compose run --rm lottery-predictor python cli.py predict
+
+  notify:
+    name: Notify Build Status
+    runs-on: ubuntu-latest
+    needs: [build, scan, verify]
+    if: always()
+    
+    steps:
+      - name: Print build summary
+        run: |
+          echo "Build: ${{ needs.build.result }}"
+          echo "Scan: ${{ needs.scan.result }}"
+          echo "Verify: ${{ needs.verify.result }}"
+          
+          if [ "${{ needs.build.result }}" = "success" ] && [ "${{ needs.verify.result }}" = "success" ]; then
+            echo "✅ Docker image build and verification successful!"
+            exit 0
+          else
+            echo "❌ Docker image build or verification failed"
+            exit 1
+          fi
