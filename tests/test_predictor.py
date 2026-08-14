@@ -23,7 +23,10 @@ class TestDataProcessor(unittest.TestCase):
         data = [
             {
                 ColumnNames.LOTTO_GAME: "Ultra Lotto 6/58",
-                ColumnNames.COMBINATIONS: f"{i+1:02d}-{i+2:02d}-{i+3:02d}-{i+4:02d}-{i+5:02d}-{i+6:02d}",
+                ColumnNames.COMBINATIONS: (
+                    f"{i+1:02d}-{i+2:02d}-{i+3:02d}-{i+4:02d}-"
+                    f"{i+5:02d}-{i+6:02d}"
+                ),
                 ColumnNames.DRAW_DATE: f"1/{i+1}/2024",
             }
             for i in range(12)

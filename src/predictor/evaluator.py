@@ -42,7 +42,7 @@ class ModelEvaluator:
         metrics_list = []
         eval_sample_size = min(20, len(featured) - 1)
         for idx in range(len(featured) - eval_sample_size, len(featured) - 1):
-            row_features = featured[feature_cols].iloc[idx : idx + 1].values
+            row_features = featured[feature_cols].iloc[idx:idx + 1].values
             pred = service.predict(row_features)
             act = actuals[idx + 1]
             m = self.evaluate_predictions(act, pred)
