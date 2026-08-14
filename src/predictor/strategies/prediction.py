@@ -90,9 +90,7 @@ class TopKPredictionStrategy(PredictionStrategy):
 
         # Get indices of top K predictions
         if len(predictions) > self.config["numbers_per_draw"]:
-            top_indices = np.argsort(predictions)[
-                -self.config["numbers_per_draw"]:
-            ]
+            top_indices = np.argsort(predictions)[-self.config["numbers_per_draw"] :]
         else:
             top_indices = np.arange(len(predictions))
 

@@ -174,9 +174,7 @@ class DataValidator:
         invalid_numbers = [n for n in numbers if n not in valid_range]
         if invalid_numbers:
             range_str = f"{min(valid_range)}-{max(valid_range)}"
-            raise ValidationError(
-                f"Numbers outside valid range {range_str}: {invalid_numbers}"
-            )
+            raise ValidationError(f"Numbers outside valid range {range_str}: {invalid_numbers}")
 
     @staticmethod
     def validate_features(features: np.ndarray, expected_shape: Optional[tuple] = None) -> None:
