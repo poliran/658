@@ -11,10 +11,7 @@
 # ============================================================================
 # Package Files
 # ============================================================================
-# setup.py: Excluded from production image to avoid pip install -e . issues
-#           (setup.py expects README.md, but README.md is also excluded)
-#           If package installation needed, include both or modify Dockerfile
-setup.py
+# Keep setup.py available to the image build; the runtime image explicitly copies it.
 README.md
 CONTRIBUTING.md
 LICENSE
