@@ -913,3 +913,21 @@ Use GitHub labels for organization:
 3. **Create git tag**: `git tag v1.1.0`
 4. **Push to GitHub**: `git push origin v1.1.0`
 5. **GitHub Actions** automatically builds and publishes (if configured)
+
+---
+
+## Copilot assistant guidance (project-specific)
+
+This project includes specific expectations for Copilot CLI sessions to reduce friction and keep work reproducible. Add or follow these rules when interacting with the repo via the Copilot CLI:
+
+- Rename branch/session before edits: Use the built-in rename_branch (for git branches) or rename_session tools instead of raw git branch commands. This makes worktrackable and avoids accidental changes to the main checkout.
+- Pre-tool short preamble: Before any tool invocation (view, edit, bash, grep, session_store_sql, etc.), include a one-line explanation of the next action and why — a short human-readable preToolPreamble helps reviewers understand intent.
+- Ask questions via ask_user tool: When a human decision is required, always use the ask_user tool (with choices when predictable) — do not ask freeform questions in plain chat text.
+- Batch parallel reads/edits: When reading or editing multiple files or ranges, call the view/edit tools in a single grouped response to leverage parallelism and avoid repeated round-trips.
+- Prefer direct tools for simple tasks: Use glob/grep/view/edit for short searches and small edits. Reserve the task/explore agents for multi-step, long-running, or independent research tasks only.
+- Large file handling: Use view_range for files >20KB and avoid reading entire large files. When viewing multiple ranges, include all view_range calls together.
+- Use targeted CLI/test commands: Prefer running a single test or a small targeted make/test invocation (e.g., `python -m pytest tests/test_predictor.py::TestDataProcessor -v`) rather than full-suite runs unless validating broad changes.
+- Session artifacts: Put transient artifacts (plans, task lists, scratch files) in the session-state artifacts directory (the environment exposes an artifacts_dir). Avoid committing session-only files to the repo.
+- Commit metadata: Include the co-author trailer `Co-authored-by: Copilot App <223556219+Copilot@users.noreply.github.com>` in commits made by Copilot unless explicitly requested otherwise.
+
+These additions are intended to codify the interaction patterns observed in prior sessions and reduce repeated clarifications. If desired, further automation (pre-commit checks, CI gates) can enforce some of these rules.
