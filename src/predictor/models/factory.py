@@ -16,8 +16,9 @@ class SklearnModelFactory(ModelFactory):
         """Create a model instance based on type and config.
 
         Args:
-            model_type: Type of model to create ('xgboost', 'random_forest', 'gradient_boosting', 'ensemble').
-            config: Configuration dictionary with model parameters.
+            model_type: Model type (xgboost, random_forest, gradient_boosting, or
+                ensemble).
+            config: Configuration dict with model parameters.
 
         Returns:
             Initialized model instance.
@@ -39,7 +40,8 @@ class SklearnModelFactory(ModelFactory):
             return self._create_ensemble(config)
         else:
             raise ValueError(
-                f"Unknown model type: {model_type}. Supported: xgboost, random_forest, gradient_boosting, ensemble"
+                f"Unknown model type: {model_type}. Supported: "
+                f"xgboost, random_forest, gradient_boosting, ensemble"
             )
 
     def _create_xgb_model(self, config: Dict) -> XGBRegressor:

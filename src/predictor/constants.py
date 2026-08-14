@@ -75,8 +75,10 @@ class LotteryConstants:
             ValueError: If lottery_type is not a valid LotteryType member.
         """
         if not isinstance(lottery_type, LotteryType):
+            type_name = type(lottery_type).__name__
             raise ValueError(
-                f"lottery_type must be a LotteryType enum member, got {type(lottery_type).__name__}: {lottery_type}"
+                f"lottery_type must be LotteryType enum member, "
+                f"got {type_name}: {lottery_type}"
             )
 
         if lottery_type not in cls.CONFIGS:

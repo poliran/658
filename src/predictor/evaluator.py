@@ -69,12 +69,18 @@ class ModelEvaluator:
         # Exact match accuracy
         exact_matches = np.sum(np.isin(predicted, actual))
         metrics["exact_matches"] = exact_matches
-        metrics["exact_match_rate"] = exact_matches / len(actual) if len(actual) > 0 else 0.0
+        if len(actual) > 0:
+            metrics["exact_match_rate"] = exact_matches / len(actual)
+        else:
+            metrics["exact_match_rate"] = 0.0
 
         # Position-wise accuracy
         position_matches = np.sum(actual == predicted)
         metrics["position_matches"] = position_matches
-        metrics["position_accuracy"] = position_matches / len(actual) if len(actual) > 0 else 0.0
+        if len(actual) > 0:
+            metrics["position_accuracy"] = position_matches / len(actual)
+        else:
+            metrics["position_accuracy"] = 0.0
 
         # Distance-based metrics
         if len(actual) > 0 and len(predicted) > 0:

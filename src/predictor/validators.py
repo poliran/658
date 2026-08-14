@@ -173,8 +173,9 @@ class DataValidator:
 
         invalid_numbers = [n for n in numbers if n not in valid_range]
         if invalid_numbers:
+            range_str = f"{min(valid_range)}-{max(valid_range)}"
             raise ValidationError(
-                f"Numbers outside valid range {min(valid_range)}-{max(valid_range)}: {invalid_numbers}"
+                f"Numbers outside valid range {range_str}: {invalid_numbers}"
             )
 
     @staticmethod
